@@ -1,0 +1,45 @@
+{
+  "recipeId": "tomato_egg",
+  "name": "番茄炒蛋",
+  "description": "MVP 默认菜谱，用于验证切菜、下锅、加热、调味、翻炒和出锅闭环。",
+  "ingredients": ["番茄", "鸡蛋"],
+  "seasonings": ["盐"],
+  "steps": [
+    {
+      "order": 1,
+      "action": "cut",
+      "target": "番茄",
+      "hint": "先把番茄切好。"
+    },
+    {
+      "order": 2,
+      "action": "put_in_pan",
+      "target": "食材",
+      "hint": "把处理好的食材下锅。"
+    },
+    {
+      "order": 3,
+      "action": "heat",
+      "target": "锅",
+      "hint": "开火加热。"
+    },
+    {
+      "order": 4,
+      "action": "season",
+      "target": "盐",
+      "hint": "加入适量盐。"
+    },
+    {
+      "order": 5,
+      "action": "stir",
+      "target": "锅",
+      "hint": "翻炒均匀。"
+    },
+    {
+      "order": 6,
+      "action": "finish",
+      "target": "菜品",
+      "hint": "完成后出锅。"
+    }
+  ]
+}
