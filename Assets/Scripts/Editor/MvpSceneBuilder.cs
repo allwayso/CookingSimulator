@@ -1,6 +1,8 @@
 using CookingSimulator.Core;
 using CookingSimulator.Services;
 using CookingSimulator.UI;
+using System;
+using System.IO;
 using UnityEditor;
 using UnityEditor.Events;
 using UnityEditor.SceneManagement;
@@ -54,6 +56,27 @@ namespace CookingSimulator.Editor
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
+        }
+
+        [MenuItem("Cooking Simulator/Build Windows Player")]
+        public static void BuildWindowsPlayer()
+        {
+            const string scenePath = "Assets/Scenes/MVP.unity";
+            const string outputPath = "Builds/Windows/CookingSimulator.exe";
+
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(scenePath, true) };
+
+            var report = BuildPipeline.BuildPlayer(
+                new[] { scenePath },
+                outputPath,
+                BuildTarget.StandaloneWindows64,
+                BuildOptions.None);
+
+            if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+            {
+                throw new InvalidOperationException($"Windows build failed: {report.summary.result}");
+            }
         }
 
         private static Canvas CreateCanvas()
@@ -324,7 +347,7 @@ namespace CookingSimulator.Editor
             rect.localScale = Vector3.one;
         }
 
-        private static void Assign(Object target, string fieldName, Object value)
+        private static void Assign(UnityEngine.Object target, string fieldName, UnityEngine.Object value)
         {
             var serializedObject = new SerializedObject(target);
             serializedObject.FindProperty(fieldName).objectReferenceValue = value;
