@@ -67,3 +67,29 @@
 ## 虚拟环境
 
 所有依赖通过conda Cook管理
+
+## 项目常用执行规则
+
+### Unity Editor
+- Unity 路径固定为 `D:\unity\Editor\Unity.exe`。
+- 需要运行 Unity Editor、batchmode、重建场景、验证编译、构建 Player 时，通常需要提权执行。
+- 如果 Unity Editor 已经打开，batchmode 可能无法正常导入脚本或写入场景；先提醒用户关闭 Editor，或等待用户确认已经关闭后再运行。
+- 不要先反复用普通权限尝试 Unity 命令；需要运行 Editor 时直接申请提权。
+
+### 常用 Unity 命令
+- 重建 MVP 场景：
+  `& "D:\unity\Editor\Unity.exe" -batchmode -quit -projectPath "D:\CookingSimulator" -executeMethod CookingSimulator.Editor.MvpSceneBuilder.BuildScene -logFile "D:\CookingSimulator\unity-rebuild-<task>.log"`
+- 验证 C# 编译：
+  `& "D:\unity\Editor\Unity.exe" -batchmode -quit -projectPath "D:\CookingSimulator" -logFile "D:\CookingSimulator\unity-verify-<task>.log"`
+- 构建 Windows Player：
+  `& "D:\unity\Editor\Unity.exe" -batchmode -quit -projectPath "D:\CookingSimulator" -executeMethod CookingSimulator.Editor.MvpSceneBuilder.BuildWindowsPlayer -logFile "D:\CookingSimulator\unity-build-windows-<task>.log"`
+
+### 验证要求
+- 修改场景生成器、Unity UI 绑定、MonoBehaviour 序列化字段后，必须重建 `Assets/Scenes/MVP.unity`。
+- 新增 Unity 脚本后，必须通过 Unity 导入生成对应 `.meta` 文件。
+- 验证时检查日志中是否有 `error CS`、`Scripts have compiler errors`、`Compiler errors`；Unity 退出码为 0 且无 C# 编译错误才算通过。
+- Unity 日志中的授权刷新失败或退出时线程清理信息，如果进程返回码为 0 且没有 C# 编译错误，一般不阻塞本任务。
+
+### Git 执行
+- 修改完成并验证后，按任务范围提交到当前 `feature/*` 分支。
+- 提交前用 `git status --short --branch` 确认不在 `main`，并确认没有无关文件被暂存。

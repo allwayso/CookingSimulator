@@ -77,6 +77,18 @@ namespace CookingSimulator.Services
             return path;
         }
 
+        public ReviewData LoadReview(string reviewId)
+        {
+            EnsureDirectories();
+            if (string.IsNullOrWhiteSpace(reviewId))
+            {
+                return null;
+            }
+
+            var path = Path.Combine(ReviewsPath, reviewId + ".json");
+            return File.Exists(path) ? JsonUtility.FromJson<ReviewData>(File.ReadAllText(path)) : null;
+        }
+
         public string SaveDish(DishData dish)
         {
             EnsureDirectories();
