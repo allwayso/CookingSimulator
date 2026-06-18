@@ -26,14 +26,13 @@ namespace CookingSimulator.UI
             gameObject.SetActive(true);
             ClearDishButtons();
             SetBackButton(false);
+            dishesText.text = "厨神菜单";
 
             if (dishes.Count == 0)
             {
-                dishesText.text = "食单为空";
                 return;
             }
 
-            dishesText.text = "选择一道菜";
             foreach (var dish in dishes)
             {
                 CreateDishButton(dish);
@@ -48,7 +47,7 @@ namespace CookingSimulator.UI
             gameObject.SetActive(true);
             ClearDishButtons();
             SetBackButton(true);
-            dishesText.text = $"选择评价者：{dish.name}";
+            dishesText.text = $"{dish.name}品鉴名录";
             CreateReviewerButton("AI 老八");
         }
 

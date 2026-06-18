@@ -40,6 +40,7 @@ namespace CookingSimulator.Editor
             var review = CreateReviewPanel(canvas.transform);
             var saveDish = CreateSaveDishPanel(canvas.transform);
             var menu = CreateMenuPanel(canvas.transform);
+            var statusBar = CreateStatusBar(canvas.transform);
 
             var managerObject = new GameObject("GameManager");
             var gameManager = managerObject.AddComponent<GameManager>();
@@ -55,6 +56,7 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "reviewUI", review);
             Assign(gameManager, "saveDishUI", saveDish);
             Assign(gameManager, "menuUI", menu);
+            Assign(gameManager, "statusBarUI", statusBar);
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
@@ -136,9 +138,35 @@ namespace CookingSimulator.Editor
             var panel = CreatePanel<RecipeSelectUI>(parent, "RecipePanel");
             var text = CreateTitle(panel.transform, "菜谱");
             var button = CreateButton(panel.transform, "开始做菜");
+            var menuButton = CreateButton(panel.transform, "厨神菜单");
             Assign(panel, "recipeText", text);
             UnityEventTools.AddPersistentListener(button.onClick, panel.SelectFirstRecipe);
+            UnityEventTools.AddPersistentListener(menuButton.onClick, panel.OpenMenu);
             return panel;
+        }
+
+        private static StatusBarUI CreateStatusBar(Transform parent)
+        {
+            var bar = new GameObject("StatusBar", typeof(RectTransform));
+            bar.transform.SetParent(parent, false);
+            var rect = bar.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(1, 1);
+            rect.pivot = new Vector2(0.5f, 1);
+            rect.offsetMin = new Vector2(0, -48);
+            rect.offsetMax = Vector2.zero;
+
+            var background = bar.AddComponent<Image>();
+            background.color = new Color(0.07f, 0.07f, 0.08f, 0.96f);
+
+            var statusBar = bar.AddComponent<StatusBarUI>();
+            var text = CreateText(bar.transform, string.Empty);
+            text.alignment = TextAnchor.MiddleLeft;
+            text.fontSize = 22;
+            StretchChild(text.gameObject, 24, 0, -24, 0);
+            Assign(statusBar, "statusText", text);
+            bar.SetActive(false);
+            return statusBar;
         }
 
         private static CookingUI CreateCookingPanel(Transform parent)

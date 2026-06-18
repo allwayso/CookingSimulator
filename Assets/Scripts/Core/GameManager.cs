@@ -24,6 +24,7 @@ namespace CookingSimulator.Core
         [SerializeField] private ReviewUI reviewUI;
         [SerializeField] private SaveDishUI saveDishUI;
         [SerializeField] private MenuUI menuUI;
+        [SerializeField] private StatusBarUI statusBarUI;
 
         private UserData currentUser;
         private RecipeData currentRecipe;
@@ -41,6 +42,7 @@ namespace CookingSimulator.Core
         public void Login(string username)
         {
             currentUser = saveManager.LoadOrCreateUser(username);
+            statusBarUI?.Show(currentUser);
             modeSelectUI.Show(currentUser, EnterChefMode);
             Hide(loginUI);
         }
@@ -48,7 +50,7 @@ namespace CookingSimulator.Core
         public void EnterChefMode()
         {
             var recipes = recipeManager.LoadRecipes();
-            recipeSelectUI.Show(recipes, StartCooking);
+            recipeSelectUI.Show(recipes, StartCooking, ShowMenuFromRecipeSelect);
             Hide(modeSelectUI);
         }
 
@@ -86,6 +88,7 @@ namespace CookingSimulator.Core
 
             currentUser.reputation += currentReview.reputationDelta;
             saveManager.SaveUser(currentUser);
+            statusBarUI?.Refresh(currentUser);
 
             reviewUI.Show(currentReview, ShowSaveDish);
             Hide(cookingUI);
@@ -124,6 +127,12 @@ namespace CookingSimulator.Core
             Hide(reviewUI);
         }
 
+        public void ShowMenuFromRecipeSelect()
+        {
+            ShowMenu();
+            Hide(recipeSelectUI);
+        }
+
         public void ShowReviewerSelection(DishData dish)
         {
             menuUI.ShowReviewers(dish, ShowMenu, reviewerName =>
@@ -158,6 +167,7 @@ namespace CookingSimulator.Core
 
                 currentUser.reputation += review.reputationDelta;
                 saveManager.SaveUser(currentUser);
+                statusBarUI?.Refresh(currentUser);
 
                 reviewUI.Show(review, ShowMenu, "返回食单");
                 Hide(menuUI);
@@ -173,6 +183,7 @@ namespace CookingSimulator.Core
             Hide(reviewUI);
             Hide(saveDishUI);
             Hide(menuUI);
+            Hide(statusBarUI);
         }
 
         private bool TryApplyAction(string action, out DishState nextState)
@@ -253,6 +264,11 @@ namespace CookingSimulator.Core
 
         private static void Hide(MonoBehaviour view)
         {
+            if (view == null)
+            {
+                return;
+            }
+
             view.gameObject.SetActive(false);
         }
     }

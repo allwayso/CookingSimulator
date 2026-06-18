@@ -12,11 +12,13 @@ namespace CookingSimulator.UI
 
         private List<RecipeData> recipes;
         private Action<RecipeData> onRecipeSelected;
+        private Action onOpenMenu;
 
-        public void Show(List<RecipeData> availableRecipes, Action<RecipeData> recipeSelectedAction)
+        public void Show(List<RecipeData> availableRecipes, Action<RecipeData> recipeSelectedAction, Action openMenuAction)
         {
             recipes = availableRecipes;
             onRecipeSelected = recipeSelectedAction;
+            onOpenMenu = openMenuAction;
             gameObject.SetActive(true);
             recipeText.text = recipes.Count == 0 ? "没有可用菜谱" : $"{recipes[0].name}\n{recipes[0].description}";
         }
@@ -29,6 +31,11 @@ namespace CookingSimulator.UI
             }
 
             onRecipeSelected?.Invoke(recipes[0]);
+        }
+
+        public void OpenMenu()
+        {
+            onOpenMenu?.Invoke();
         }
     }
 }
