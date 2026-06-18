@@ -120,6 +120,7 @@ namespace CookingSimulator.Editor
         {
             var panel = CreatePanel<CookingUI>(parent, "CookingPanel");
             var recipe = CreateTitle(panel.transform, "做菜");
+            CreateKitchenVisual(panel.transform, out var dishStateImage);
             var state = CreateText(panel.transform, "当前状态");
             var hint = CreateText(panel.transform, "提示");
             var message = CreateText(panel.transform, string.Empty);
@@ -127,6 +128,7 @@ namespace CookingSimulator.Editor
             Assign(panel, "stateText", state);
             Assign(panel, "hintText", hint);
             Assign(panel, "messageText", message);
+            Assign(panel, "dishStateImage", dishStateImage);
             UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "切菜").onClick, panel.Cut);
             UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "下锅").onClick, panel.PutInPan);
             UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "加热").onClick, panel.Heat);
@@ -134,6 +136,40 @@ namespace CookingSimulator.Editor
             UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "翻炒").onClick, panel.Stir);
             UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "出锅").onClick, panel.Finish);
             return panel;
+        }
+
+        private static void CreateKitchenVisual(Transform parent, out Image dishStateImage)
+        {
+            var stage = new GameObject("KitchenVisual", typeof(RectTransform));
+            stage.transform.SetParent(parent, false);
+            SetPreferredSize(stage, 760, 220);
+            var background = stage.AddComponent<Image>();
+            background.color = new Color(0.22f, 0.2f, 0.17f);
+
+            CreateVisualBlock(stage.transform, "BackWall", new Vector2(0, 58), new Vector2(720, 90), new Color(0.55f, 0.5f, 0.42f));
+            CreateVisualBlock(stage.transform, "Counter", new Vector2(0, -52), new Vector2(720, 70), new Color(0.35f, 0.27f, 0.2f));
+            CreateVisualBlock(stage.transform, "Pan", new Vector2(0, -20), new Vector2(230, 86), new Color(0.08f, 0.09f, 0.09f));
+            CreateVisualBlock(stage.transform, "PanInner", new Vector2(0, -20), new Vector2(176, 48), new Color(0.16f, 0.17f, 0.16f));
+            CreateVisualBlock(stage.transform, "Tomato", new Vector2(-250, -30), new Vector2(78, 58), new Color(0.82f, 0.25f, 0.2f));
+            CreateVisualBlock(stage.transform, "Egg", new Vector2(-165, -30), new Vector2(74, 54), new Color(0.95f, 0.88f, 0.56f));
+            CreateVisualBlock(stage.transform, "Seasoning", new Vector2(258, -22), new Vector2(58, 96), new Color(0.9f, 0.92f, 0.88f));
+            CreateVisualBlock(stage.transform, "Flame", new Vector2(0, -84), new Vector2(120, 24), new Color(0.95f, 0.42f, 0.18f));
+
+            dishStateImage = CreateVisualBlock(stage.transform, "DishStateColor", new Vector2(0, -20), new Vector2(118, 38), new Color(0.82f, 0.25f, 0.2f));
+        }
+
+        private static Image CreateVisualBlock(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, Color color)
+        {
+            var obj = new GameObject(name, typeof(RectTransform));
+            obj.transform.SetParent(parent, false);
+            var rect = obj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+            var image = obj.AddComponent<Image>();
+            image.color = color;
+            return image;
         }
 
         private static ReviewUI CreateReviewPanel(Transform parent)
