@@ -119,9 +119,20 @@ namespace CookingSimulator.Core
         public void ShowMenu()
         {
             var dishes = saveManager.LoadDishes(currentUser.userId);
-            menuUI.Show(dishes, EnterChefMode, ShowLaobaReview);
+            menuUI.ShowDishes(dishes, EnterChefMode, ShowReviewerSelection);
             Hide(saveDishUI);
             Hide(reviewUI);
+        }
+
+        public void ShowReviewerSelection(DishData dish)
+        {
+            menuUI.ShowReviewers(dish, ShowMenu, reviewerName =>
+            {
+                if (reviewerName == "AI 老八")
+                {
+                    ShowLaobaReview(dish);
+                }
+            });
         }
 
         public void ShowLaobaReview(DishData dish)

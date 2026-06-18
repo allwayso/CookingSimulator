@@ -216,7 +216,8 @@ namespace CookingSimulator.Editor
         private static ReviewUI CreateReviewPanel(Transform parent)
         {
             var panel = CreatePanel<ReviewUI>(parent, "ReviewPanel");
-            var text = CreateTitle(panel.transform, "评价");
+            CreateTitle(panel.transform, "评价");
+            var text = CreateScrollableTextArea(panel.transform);
             var button = CreateButton(panel.transform, "保存菜品");
             var buttonText = button.GetComponentInChildren<Text>();
             Assign(panel, "reviewText", text);
@@ -247,10 +248,14 @@ namespace CookingSimulator.Editor
             var dishRoot = CreateButtonColumn(panel.transform);
             var dishButtonTemplate = CreateButton(dishRoot.transform, "菜品");
             dishButtonTemplate.gameObject.SetActive(false);
+            var backButton = CreateButton(panel.transform, "返回食单");
+            backButton.gameObject.SetActive(false);
             var button = CreateButton(panel.transform, "再做一道");
             Assign(panel, "dishesText", text);
             Assign(panel, "dishesButtonRoot", dishRoot.transform);
             Assign(panel, "dishButtonTemplate", dishButtonTemplate);
+            Assign(panel, "backButton", backButton);
+            UnityEventTools.AddPersistentListener(backButton.onClick, panel.BackToDishes);
             UnityEventTools.AddPersistentListener(button.onClick, panel.CookAgain);
             return panel;
         }
@@ -268,6 +273,96 @@ namespace CookingSimulator.Editor
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = false;
             return column;
+        }
+
+        private static Text CreateScrollableTextArea(Transform parent)
+        {
+            var scrollObject = new GameObject("ReviewScrollView", typeof(RectTransform));
+            scrollObject.transform.SetParent(parent, false);
+            SetPreferredSize(scrollObject, 760, 320);
+            var scrollImage = scrollObject.AddComponent<Image>();
+            scrollImage.color = new Color(1f, 1f, 1f, 0.06f);
+            var scrollRect = scrollObject.AddComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+
+            var viewport = new GameObject("Viewport", typeof(RectTransform));
+            viewport.transform.SetParent(scrollObject.transform, false);
+            var viewportRect = viewport.GetComponent<RectTransform>();
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = new Vector2(12, 12);
+            viewportRect.offsetMax = new Vector2(-24, -12);
+            var viewportImage = viewport.AddComponent<Image>();
+            viewportImage.color = new Color(1f, 1f, 1f, 0.02f);
+            viewport.AddComponent<Mask>().showMaskGraphic = false;
+
+            var content = new GameObject("Content", typeof(RectTransform));
+            content.transform.SetParent(viewport.transform, false);
+            var contentRect = content.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0, 1);
+            contentRect.anchorMax = new Vector2(1, 1);
+            contentRect.pivot = new Vector2(0.5f, 1);
+            contentRect.sizeDelta = new Vector2(0, 320);
+            var contentFitter = content.AddComponent<ContentSizeFitter>();
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var text = CreateText(content.transform, string.Empty);
+            text.alignment = TextAnchor.UpperLeft;
+            text.fontSize = 22;
+            var textRect = text.GetComponent<RectTransform>();
+            textRect.anchorMin = new Vector2(0, 1);
+            textRect.anchorMax = new Vector2(1, 1);
+            textRect.pivot = new Vector2(0.5f, 1);
+            textRect.sizeDelta = new Vector2(0, 320);
+            var textLayout = text.gameObject.GetComponent<LayoutElement>();
+            textLayout.preferredHeight = 320;
+            textLayout.minHeight = 320;
+
+            var scrollbar = CreateVerticalScrollbar(scrollObject.transform);
+            scrollRect.viewport = viewportRect;
+            scrollRect.content = contentRect;
+            scrollRect.verticalScrollbar = scrollbar;
+            scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+            return text;
+        }
+
+        private static Scrollbar CreateVerticalScrollbar(Transform parent)
+        {
+            var scrollbarObject = new GameObject("Scrollbar", typeof(RectTransform));
+            scrollbarObject.transform.SetParent(parent, false);
+            var rect = scrollbarObject.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1, 0);
+            rect.anchorMax = new Vector2(1, 1);
+            rect.pivot = new Vector2(1, 1);
+            rect.sizeDelta = new Vector2(16, 0);
+            rect.offsetMin = new Vector2(-16, 0);
+            rect.offsetMax = Vector2.zero;
+
+            var background = scrollbarObject.AddComponent<Image>();
+            background.color = new Color(1f, 1f, 1f, 0.08f);
+            var scrollbar = scrollbarObject.AddComponent<Scrollbar>();
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+
+            var slidingArea = new GameObject("Sliding Area", typeof(RectTransform));
+            slidingArea.transform.SetParent(scrollbarObject.transform, false);
+            var slidingRect = slidingArea.GetComponent<RectTransform>();
+            slidingRect.anchorMin = Vector2.zero;
+            slidingRect.anchorMax = Vector2.one;
+            slidingRect.offsetMin = new Vector2(2, 2);
+            slidingRect.offsetMax = new Vector2(-2, -2);
+
+            var handle = new GameObject("Handle", typeof(RectTransform));
+            handle.transform.SetParent(slidingArea.transform, false);
+            var handleRect = handle.GetComponent<RectTransform>();
+            handleRect.anchorMin = Vector2.zero;
+            handleRect.anchorMax = Vector2.one;
+            handleRect.offsetMin = Vector2.zero;
+            handleRect.offsetMax = Vector2.zero;
+            var handleImage = handle.AddComponent<Image>();
+            handleImage.color = new Color(0.35f, 0.66f, 0.9f, 0.95f);
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.handleRect = handleRect;
+            return scrollbar;
         }
 
         private static T CreatePanel<T>(Transform parent, string name) where T : MonoBehaviour

@@ -21,7 +21,7 @@ namespace CookingSimulator.UI
         {
             onContinue = continueAction;
             gameObject.SetActive(true);
-            reviewText.text = $"评分：{review.score}\n{review.summary}\n建议：{review.suggestion}\n声望变化：{review.reputationDelta}";
+            reviewText.text = $"评分：{review.score}\n\n评价：\n{review.summary}\n\n建议：\n{review.suggestion}\n\n声望变化：{review.reputationDelta}";
             if (continueButtonText != null)
             {
                 continueButtonText.text = continueText;
