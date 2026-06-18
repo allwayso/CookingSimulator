@@ -129,13 +129,29 @@ namespace CookingSimulator.Editor
             Assign(panel, "hintText", hint);
             Assign(panel, "messageText", message);
             Assign(panel, "dishStateImage", dishStateImage);
-            UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "切菜").onClick, panel.Cut);
-            UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "下锅").onClick, panel.PutInPan);
-            UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "加热").onClick, panel.Heat);
-            UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "加调料").onClick, panel.Season);
-            UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "翻炒").onClick, panel.Stir);
-            UnityEventTools.AddPersistentListener(CreateButton(panel.transform, "出锅").onClick, panel.Finish);
+            var actions = CreateButtonRow(panel.transform);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "切菜").onClick, panel.Cut);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "下锅").onClick, panel.PutInPan);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加热").onClick, panel.Heat);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加调料").onClick, panel.Season);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "翻炒").onClick, panel.Stir);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "出锅").onClick, panel.Finish);
             return panel;
+        }
+
+        private static GameObject CreateButtonRow(Transform parent)
+        {
+            var row = new GameObject("ActionButtonRow", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            SetPreferredSize(row, 840, 56);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 10;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            return row;
         }
 
         private static void CreateKitchenVisual(Transform parent, out Image dishStateImage)
