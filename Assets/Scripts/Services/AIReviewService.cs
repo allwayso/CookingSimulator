@@ -21,17 +21,16 @@ namespace CookingSimulator.Services
             ReviewData baseReview,
             Action<ReviewData, bool, string> onComplete)
         {
-            if (!TryLoadConfig(out var config, out var configError))
+            if (!TryLoadProviders(out var providers, out var configError))
             {
                 onComplete(CreateFallbackReview(dish, baseReview, configError), false, configError);
                 yield break;
             }
 
             var prompt = BuildPrompt(dish, recipe, log, baseReview, LoadLaobaProfile());
-            var requestJson = JsonUtility.ToJson(ChatCompletionRequest.Create(config.model, prompt));
-            string responseText = null;
-            string requestError = null;
-            yield return RunPostRequest(config, requestJson, (response, error) =>
+            var responseText = string.Empty;
+            var requestError = string.Empty;
+            yield return RunProviderRequests(providers, prompt, (response, error) =>
             {
                 responseText = response;
                 requestError = error;
@@ -54,14 +53,19 @@ namespace CookingSimulator.Services
 
         public IEnumerator TestConnection(Action<bool, string> onComplete)
         {
-            if (!TryLoadConfig(out var config, out var configError))
+            if (!TryLoadProviders(out var providers, out var configError))
             {
                 onComplete(false, configError);
                 yield break;
             }
 
-            var requestJson = JsonUtility.ToJson(ChatCompletionRequest.Create(config.model, "只回复 OK。"));
-            var responseText = SendPostRequest(config, requestJson, out var requestError);
+            var responseText = string.Empty;
+            var requestError = string.Empty;
+            yield return RunProviderRequests(providers, "只回复 OK。", (response, error) =>
+            {
+                responseText = response;
+                requestError = error;
+            });
 
             if (!string.IsNullOrWhiteSpace(requestError))
             {
@@ -74,15 +78,14 @@ namespace CookingSimulator.Services
 
         public static bool TestConnectionNow(out string message)
         {
-            if (!TryLoadConfig(out var config, out var configError))
+            if (!TryLoadProviders(out var providers, out var configError))
             {
                 message = configError;
                 return false;
             }
 
-            var requestJson = JsonUtility.ToJson(ChatCompletionRequest.Create(config.model, "只回复 OK。"));
-            var responseText = SendPostRequest(config, requestJson, out var requestError);
-            if (!string.IsNullOrWhiteSpace(requestError))
+            var responseText = string.Empty;
+            if (!TrySendWithProviders(providers, "只回复 OK。", out responseText, out var requestError))
             {
                 message = requestError;
                 return false;
@@ -92,7 +95,7 @@ namespace CookingSimulator.Services
             return !string.IsNullOrWhiteSpace(responseText);
         }
 
-        private static IEnumerator RunPostRequest(AIReviewConfig config, string requestJson, Action<string, string> onComplete)
+        private static IEnumerator RunProviderRequests(AIReviewProvider[] providers, string prompt, Action<string, string> onComplete)
         {
             var completed = false;
             string responseText = null;
@@ -102,7 +105,7 @@ namespace CookingSimulator.Services
             {
                 try
                 {
-                    responseText = SendPostRequest(config, requestJson, out error);
+                    TrySendWithProviders(providers, prompt, out responseText, out error);
                 }
                 catch (Exception exception)
                 {
@@ -122,15 +125,43 @@ namespace CookingSimulator.Services
             onComplete(responseText, error);
         }
 
-        private static string SendPostRequest(AIReviewConfig config, string requestJson, out string error)
+        private static bool TrySendWithProviders(AIReviewProvider[] providers, string prompt, out string responseText, out string error)
+        {
+            responseText = null;
+            var errors = new StringBuilder();
+            foreach (var provider in providers)
+            {
+                var requestJson = JsonUtility.ToJson(ChatCompletionRequest.Create(provider.model, prompt));
+                var result = SendPostRequest(provider, requestJson, out var providerError);
+                if (string.IsNullOrWhiteSpace(providerError))
+                {
+                    responseText = result;
+                    error = null;
+                    return true;
+                }
+
+                if (errors.Length > 0)
+                {
+                    errors.Append(" | ");
+                }
+
+                var name = string.IsNullOrWhiteSpace(provider.name) ? "unnamed" : provider.name;
+                errors.Append(name).Append(": ").Append(providerError);
+            }
+
+            error = errors.Length == 0 ? "No AI providers configured." : errors.ToString();
+            return false;
+        }
+
+        private static string SendPostRequest(AIReviewProvider provider, string requestJson, out string error)
         {
             error = null;
             try
             {
-                var request = (HttpWebRequest)WebRequest.Create(BuildChatCompletionsUrl(config.baseUrl));
+                var request = (HttpWebRequest)WebRequest.Create(BuildChatCompletionsUrl(provider.baseUrl));
                 request.Method = "POST";
                 request.ContentType = "application/json";
-                request.Headers["Authorization"] = "Bearer " + config.apiKey;
+                request.Headers["Authorization"] = "Bearer " + provider.apiKey;
                 request.Timeout = 30000;
 
                 var body = Encoding.UTF8.GetBytes(requestJson);
@@ -158,9 +189,9 @@ namespace CookingSimulator.Services
             }
         }
 
-        private static bool TryLoadConfig(out AIReviewConfig config, out string error)
+        private static bool TryLoadProviders(out AIReviewProvider[] providers, out string error)
         {
-            config = null;
+            providers = null;
             error = string.Empty;
 
             foreach (var path in GetConfigPaths())
@@ -170,34 +201,55 @@ namespace CookingSimulator.Services
                     continue;
                 }
 
-                config = JsonUtility.FromJson<AIReviewConfig>(File.ReadAllText(path));
+                var json = File.ReadAllText(path);
+                providers = ParseProviders(json);
                 break;
             }
 
-            if (config == null)
+            if (providers == null || providers.Length == 0)
             {
                 error = "Missing ai_review.local.json.";
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(config.baseUrl))
+            for (var index = 0; index < providers.Length; index++)
             {
-                config.baseUrl = "https://api.openai.com/v1";
-            }
+                var provider = providers[index];
+                if (string.IsNullOrWhiteSpace(provider.baseUrl) || !Uri.IsWellFormedUriString(provider.baseUrl, UriKind.Absolute))
+                {
+                    provider.baseUrl = "https://api.openai.com/v1";
+                }
 
-            if (!Uri.IsWellFormedUriString(config.baseUrl, UriKind.Absolute))
-            {
-                config.baseUrl = "https://api.openai.com/v1";
-            }
+                if (string.IsNullOrWhiteSpace(provider.apiKey) || string.IsNullOrWhiteSpace(provider.model))
+                {
+                    error = "Every AI provider must include apiKey and model.";
+                    return false;
+                }
 
-            if (string.IsNullOrWhiteSpace(config.apiKey) ||
-                string.IsNullOrWhiteSpace(config.model))
-            {
-                error = "AI config must include apiKey and model.";
-                return false;
+                if (string.IsNullOrWhiteSpace(provider.name))
+                {
+                    provider.name = "provider_" + (index + 1);
+                }
             }
 
             return true;
+        }
+
+        private static AIReviewProvider[] ParseProviders(string json)
+        {
+            var config = JsonUtility.FromJson<AIReviewConfig>(json);
+            if (config != null && config.providers != null && config.providers.Length > 0)
+            {
+                return config.providers;
+            }
+
+            var legacy = JsonUtility.FromJson<AIReviewProvider>(json);
+            if (legacy != null && !string.IsNullOrWhiteSpace(legacy.apiKey))
+            {
+                return new[] { legacy };
+            }
+
+            return Array.Empty<AIReviewProvider>();
         }
 
         private static IEnumerable<string> GetConfigPaths()
