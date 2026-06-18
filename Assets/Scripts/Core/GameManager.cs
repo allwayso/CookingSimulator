@@ -14,6 +14,7 @@ namespace CookingSimulator.Core
         [SerializeField] private RecipeManager recipeManager;
         [SerializeField] private LogManager logManager;
         [SerializeField] private ReviewManager reviewManager;
+        [SerializeField] private AIReviewService aiReviewService;
 
         [Header("Views")]
         [SerializeField] private LoginUI loginUI;
@@ -107,6 +108,7 @@ namespace CookingSimulator.Core
                 score = currentReview.score,
                 finalState = currentState,
                 logPath = currentLogPath,
+                reviewId = currentReview.reviewId,
                 reviewText = currentReview.summary,
                 createdAt = DateTime.UtcNow.ToString("O")
             };
@@ -117,8 +119,38 @@ namespace CookingSimulator.Core
         public void ShowMenu()
         {
             var dishes = saveManager.LoadDishes(currentUser.userId);
-            menuUI.Show(dishes, EnterChefMode);
+            menuUI.Show(dishes, EnterChefMode, ShowLaobaReview);
             Hide(saveDishUI);
+            Hide(reviewUI);
+        }
+
+        public void ShowLaobaReview(DishData dish)
+        {
+            var existingReview = saveManager.LoadReview(dish.reviewId);
+            if (existingReview != null && existingReview.summary.StartsWith("AI 老八评价", StringComparison.Ordinal))
+            {
+                reviewUI.Show(existingReview, ShowMenu, "返回食单");
+                Hide(menuUI);
+                return;
+            }
+
+            var recipe = LoadRecipeForDish(dish);
+            var log = LoadLog(dish.logPath);
+            var baseReview = existingReview ?? reviewManager.CreateLocalLaobaReview(dish);
+            StartCoroutine(aiReviewService.CreateLaobaReview(dish, recipe, log, baseReview, (review, usedAi, error) =>
+            {
+                saveManager.SaveReview(review);
+                dish.reviewId = review.reviewId;
+                dish.reviewText = review.summary;
+                dish.score = review.score;
+                saveManager.SaveDish(dish);
+
+                currentUser.reputation += review.reputationDelta;
+                saveManager.SaveUser(currentUser);
+
+                reviewUI.Show(review, ShowMenu, "返回食单");
+                Hide(menuUI);
+            }));
         }
 
         private void ShowLogin()
@@ -170,6 +202,42 @@ namespace CookingSimulator.Core
             }
 
             return false;
+        }
+
+        private RecipeData LoadRecipeForDish(DishData dish)
+        {
+            var recipes = recipeManager.LoadRecipes();
+            foreach (var recipe in recipes)
+            {
+                if (!string.IsNullOrWhiteSpace(dish.logPath))
+                {
+                    var log = LoadLog(dish.logPath);
+                    if (log != null && log.recipeId == recipe.recipeId)
+                    {
+                        return recipe;
+                    }
+                }
+            }
+
+            return recipes.Count > 0 ? recipes[0] : new RecipeData
+            {
+                recipeId = "unknown",
+                name = "未知菜谱",
+                description = string.Empty,
+                ingredients = Array.Empty<string>(),
+                seasonings = Array.Empty<string>(),
+                steps = Array.Empty<RecipeStep>()
+            };
+        }
+
+        private static CookingLog LoadLog(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            {
+                return new CookingLog();
+            }
+
+            return JsonUtility.FromJson<CookingLog>(System.IO.File.ReadAllText(path));
         }
 
         private static void Hide(MonoBehaviour view)

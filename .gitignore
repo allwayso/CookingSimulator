@@ -130,6 +130,11 @@ $RECYCLE.BIN/
 /[Aa]ssets/[Ss]treaming[Aa]ssets/config.json
 /[Aa]ssets/[Ss]treaming[Aa]ssets/*secret*.json
 /[Aa]ssets/[Ss]treaming[Aa]ssets/*key*.json
+/api.txt
+/ai_review.local.json
+/[Aa]ssets/[Ss]treaming[Aa]ssets/**/ai_review*.json
+*api*.local.json
+*secret*.local.json
 *.env
 .env.*
 

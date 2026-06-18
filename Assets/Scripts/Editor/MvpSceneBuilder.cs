@@ -31,6 +31,7 @@ namespace CookingSimulator.Editor
             var recipeManager = services.AddComponent<RecipeManager>();
             var logManager = services.AddComponent<LogManager>();
             var reviewManager = services.AddComponent<ReviewManager>();
+            var aiReviewService = services.AddComponent<AIReviewService>();
 
             var login = CreateLoginPanel(canvas.transform);
             var mode = CreateModePanel(canvas.transform);
@@ -46,6 +47,7 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "recipeManager", recipeManager);
             Assign(gameManager, "logManager", logManager);
             Assign(gameManager, "reviewManager", reviewManager);
+            Assign(gameManager, "aiReviewService", aiReviewService);
             Assign(gameManager, "loginUI", login);
             Assign(gameManager, "modeSelectUI", mode);
             Assign(gameManager, "recipeSelectUI", recipe);
@@ -216,7 +218,9 @@ namespace CookingSimulator.Editor
             var panel = CreatePanel<ReviewUI>(parent, "ReviewPanel");
             var text = CreateTitle(panel.transform, "评价");
             var button = CreateButton(panel.transform, "保存菜品");
+            var buttonText = button.GetComponentInChildren<Text>();
             Assign(panel, "reviewText", text);
+            Assign(panel, "continueButtonText", buttonText);
             UnityEventTools.AddPersistentListener(button.onClick, panel.Continue);
             return panel;
         }
@@ -240,10 +244,30 @@ namespace CookingSimulator.Editor
         {
             var panel = CreatePanel<MenuUI>(parent, "MenuPanel");
             var text = CreateTitle(panel.transform, "我的食单");
+            var dishRoot = CreateButtonColumn(panel.transform);
+            var dishButtonTemplate = CreateButton(dishRoot.transform, "菜品");
+            dishButtonTemplate.gameObject.SetActive(false);
             var button = CreateButton(panel.transform, "再做一道");
             Assign(panel, "dishesText", text);
+            Assign(panel, "dishesButtonRoot", dishRoot.transform);
+            Assign(panel, "dishButtonTemplate", dishButtonTemplate);
             UnityEventTools.AddPersistentListener(button.onClick, panel.CookAgain);
             return panel;
+        }
+
+        private static GameObject CreateButtonColumn(Transform parent)
+        {
+            var column = new GameObject("DishButtonColumn", typeof(RectTransform));
+            column.transform.SetParent(parent, false);
+            SetPreferredSize(column, 760, 260);
+            var layout = column.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 10;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            return column;
         }
 
         private static T CreatePanel<T>(Transform parent, string name) where T : MonoBehaviour

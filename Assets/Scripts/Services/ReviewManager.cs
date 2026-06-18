@@ -45,5 +45,21 @@ namespace CookingSimulator.Services
                 createdAt = DateTime.UtcNow.ToString("O")
             };
         }
+
+        public ReviewData CreateLocalLaobaReview(DishData dish)
+        {
+            var score = Mathf.Clamp(dish.score - 5, 0, 100);
+            var reputationDelta = score >= 80 ? 2 : score >= 60 ? 0 : -2;
+            return new ReviewData
+            {
+                reviewId = Guid.NewGuid().ToString("N"),
+                dishId = dish.dishId,
+                score = score,
+                summary = $"本地老八评价：{dish.name} 看着能吃，价格 {dish.price}，基础评分 {score}。",
+                suggestion = "先保证流程完整，再让 AI 老八给更细的口味反馈。",
+                reputationDelta = reputationDelta,
+                createdAt = DateTime.UtcNow.ToString("O")
+            };
+        }
     }
 }

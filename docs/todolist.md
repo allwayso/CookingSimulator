@@ -11,6 +11,8 @@
   - `6eb8987 feat: polish MVP cooking screen`
   - `ff4bbf9 fix: arrange cooking actions horizontally`
   - `e8fac8c fix: shrink cooking action buttons`
+- 当前构建与 AI 提交：
+  - `2635f95 build: add Windows player build command`
 - 当前 MVP 场景：`Assets/Scenes/MVP.unity`
 - 默认菜谱：`Assets/StreamingAssets/Recipes/tomato_egg.json`
 
@@ -53,6 +55,13 @@
   - 菜品状态颜色块
 - 已实现做菜阶段步骤提示随当前状态推进。
 - 已将做菜页操作按钮改为横向排列，并缩小按钮宽度，避免超出右侧边界。
+- 已增加 Windows `.exe` 构建命令，并成功生成本地 Windows 构建。
+- 已接入 AI 老八评价的 MVP 链路：
+  - 使用 `ai_review.local.json` 作为本机私有 API 配置。
+  - `api.txt` 和本地 AI 配置已加入 `.gitignore` 保护。
+  - 已新增 AI 老八口味文档。
+  - 食单页菜品支持按钮点击查看老八评价。
+  - AI 调用失败时会降级为本地老八评价。
 - 已通过人工测试确认核心逻辑能够跑通。
 
 ## MVP 中尚未完善的内容
@@ -62,8 +71,7 @@
 - 当前 UI 仍是 MVP 临时界面，已有基础厨房视觉，但尚未进行正式美术设计。
 - 当前没有学习 / 挑战模式切换。
 - 当前本地评价规则较简单，只基于关键动作完成情况评分。
-- 当前没有真实 AI API 接入。
-- 当前没有 AI 调用失败后的真实降级链路，因为 AI 调用尚未实现。
+- 当前 AI API 代码链路已接入，但本机配置实测返回 401 Unauthorized，需要更新有效 API key/baseUrl/model 后复测。
 - 当前没有截图保存和菜品图片字段。
 - 当前没有 `BURNT` 烧焦状态。
 - 当前非法操作只做简单提示，没有详细错误日志。
@@ -86,11 +94,10 @@
 
 ## 下一步建议
 
-1. 增加学习 / 挑战模式切换，但只改变提示显示，不扩展复杂玩法。
-2. 增加 Windows `.exe` 构建验证，确认 MVP 能独立运行。
+1. 更新本机 `ai_review.local.json` 为有效 API 配置，并重新运行 AI API 可用性测试。
+2. 增加学习 / 挑战模式切换，但只改变提示显示，不扩展复杂玩法。
 3. 强化本地评价规则，让评分能反映顺序错误、缺失动作和重复操作。
 4. 加入 `BURNT` 状态和简单火候计时。
-5. 在 MVP 稳定后再设计真实 AI API 接入。
 
 ## 后续开发原则
 
