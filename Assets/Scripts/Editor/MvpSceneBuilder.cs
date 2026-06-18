@@ -130,12 +130,12 @@ namespace CookingSimulator.Editor
             Assign(panel, "messageText", message);
             Assign(panel, "dishStateImage", dishStateImage);
             var actions = CreateButtonRow(panel.transform);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "切菜").onClick, panel.Cut);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "下锅").onClick, panel.PutInPan);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加热").onClick, panel.Heat);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加调料").onClick, panel.Season);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "翻炒").onClick, panel.Stir);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "出锅").onClick, panel.Finish);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "切菜", 120).onClick, panel.Cut);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "下锅", 120).onClick, panel.PutInPan);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加热", 120).onClick, panel.Heat);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加调料", 120).onClick, panel.Season);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "翻炒", 120).onClick, panel.Stir);
+            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "出锅", 120).onClick, panel.Finish);
             return panel;
         }
 
@@ -286,9 +286,14 @@ namespace CookingSimulator.Editor
 
         private static Button CreateButton(Transform parent, string text)
         {
+            return CreateButton(parent, text, 260);
+        }
+
+        private static Button CreateButton(Transform parent, string text, float width)
+        {
             var obj = new GameObject(text + "Button", typeof(RectTransform));
             obj.transform.SetParent(parent, false);
-            SetPreferredSize(obj, 260, 48);
+            SetPreferredSize(obj, width, 48);
             var image = obj.AddComponent<Image>();
             image.color = new Color(0.2f, 0.45f, 0.8f);
             var button = obj.AddComponent<Button>();
