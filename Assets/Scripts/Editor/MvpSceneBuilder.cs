@@ -121,22 +121,33 @@ namespace CookingSimulator.Editor
 
             var background = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
             background.name = "LoginBackgroundRoot";
-            background.transform.position = Vector3.zero;
             return background;
         }
 
         private static LoginUI CreateLoginPanel(Transform parent)
         {
-            var panel = CreatePixelPanel<LoginUI>(parent, "LoginPanel", 460, 310);
-            var title = CreateTitle(panel.transform, "胡闹厨房 MVP");
-            title.color = new Color(1f, 0.92f, 0.62f);
-            var input = CreateInput(panel.transform, "用户名");
-            var message = CreateText(panel.transform, string.Empty);
-            var button = CreatePrefabButton(panel.transform, "Assets/prefab/UI/进入游戏Button.prefab", "进入游戏");
-            Assign(panel, "usernameInput", input);
-            Assign(panel, "messageText", message);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.Submit);
-            return panel;
+            const string prefabPath = "Assets/prefab/UI/LoginPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
+            }
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab, parent) as GameObject;
+            if (instance == null)
+            {
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
+            }
+
+            instance.name = "LoginPanel";
+
+            var loginUI = instance.GetComponent<LoginUI>();
+            if (loginUI == null)
+            {
+                throw new InvalidOperationException("LoginPanel prefab must have LoginUI component.");
+            }
+
+            return loginUI;
         }
 
         private static ModeSelectUI CreateModePanel(Transform parent)
