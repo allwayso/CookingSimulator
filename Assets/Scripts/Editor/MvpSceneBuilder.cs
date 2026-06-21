@@ -132,7 +132,7 @@ namespace CookingSimulator.Editor
             title.color = new Color(1f, 0.92f, 0.62f);
             var input = CreateInput(panel.transform, "用户名");
             var message = CreateText(panel.transform, string.Empty);
-            var button = CreateButton(panel.transform, "进入游戏");
+            var button = CreatePrefabButton(panel.transform, "Assets/prefab/UI/进入游戏Button.prefab", "进入游戏");
             Assign(panel, "usernameInput", input);
             Assign(panel, "messageText", message);
             UnityEventTools.AddPersistentListener(button.onClick, panel.Submit);
@@ -529,6 +529,43 @@ namespace CookingSimulator.Editor
             label.fontSize = 24;
             label.color = new Color(1f, 0.94f, 0.72f);
             StretchChild(label.gameObject, 0, 0, 0, 0);
+            return button;
+        }
+
+        private static Button CreatePrefabButton(Transform parent, string prefabPath, string text)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                return CreateButton(parent, text);
+            }
+
+            var obj = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (obj == null)
+            {
+                return CreateButton(parent, text);
+            }
+
+            obj.transform.SetParent(parent, false);
+            obj.name = text + "Button";
+
+            var button = obj.GetComponent<Button>() ?? obj.AddComponent<Button>();
+            button.onClick.RemoveAllListeners();
+            for (var index = button.onClick.GetPersistentEventCount() - 1; index >= 0; index--)
+            {
+                UnityEventTools.RemovePersistentListener(button.onClick, index);
+            }
+
+            var label = obj.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.text = text;
+            }
+
+            var layout = obj.GetComponent<LayoutElement>() ?? obj.AddComponent<LayoutElement>();
+            layout.preferredWidth = 260;
+            layout.preferredHeight = 48;
+            layout.minHeight = 48;
             return button;
         }
 
