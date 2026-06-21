@@ -25,6 +25,7 @@ namespace CookingSimulator.Core
         [SerializeField] private SaveDishUI saveDishUI;
         [SerializeField] private MenuUI menuUI;
         [SerializeField] private StatusBarUI statusBarUI;
+        [SerializeField] private GameObject loginBackgroundRoot;
 
         private UserData currentUser;
         private RecipeData currentRecipe;
@@ -45,6 +46,7 @@ namespace CookingSimulator.Core
             statusBarUI?.Show(currentUser);
             modeSelectUI.Show(currentUser, EnterChefMode);
             Hide(loginUI);
+            SetLoginBackgroundVisible(true);
         }
 
         public void EnterChefMode()
@@ -52,6 +54,7 @@ namespace CookingSimulator.Core
             var recipes = recipeManager.LoadRecipes();
             recipeSelectUI.Show(recipes, StartCooking, ShowMenuFromRecipeSelect);
             Hide(modeSelectUI);
+            SetLoginBackgroundVisible(false);
         }
 
         public void StartCooking(RecipeData recipe)
@@ -184,6 +187,7 @@ namespace CookingSimulator.Core
             Hide(saveDishUI);
             Hide(menuUI);
             Hide(statusBarUI);
+            SetLoginBackgroundVisible(true);
         }
 
         private bool TryApplyAction(string action, out DishState nextState)
@@ -270,6 +274,14 @@ namespace CookingSimulator.Core
             }
 
             view.gameObject.SetActive(false);
+        }
+
+        private void SetLoginBackgroundVisible(bool visible)
+        {
+            if (loginBackgroundRoot != null)
+            {
+                loginBackgroundRoot.SetActive(visible);
+            }
         }
     }
 }

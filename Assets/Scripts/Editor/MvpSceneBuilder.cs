@@ -20,6 +20,7 @@ namespace CookingSimulator.Editor
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "MVP";
 
+            var loginBackground = CreateLoginBackground();
             CreateCamera();
             var canvas = CreateCanvas();
             var eventSystem = new GameObject("EventSystem");
@@ -57,6 +58,7 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "saveDishUI", saveDish);
             Assign(gameManager, "menuUI", menu);
             Assign(gameManager, "statusBarUI", statusBar);
+            Assign(gameManager, "loginBackgroundRoot", loginBackground);
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
@@ -105,16 +107,32 @@ namespace CookingSimulator.Editor
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.08f, 0.08f, 0.09f);
             camera.orthographic = true;
-            camera.orthographicSize = 5;
+            camera.orthographicSize = 7.5f;
+        }
+
+        private static GameObject CreateLoginBackground()
+        {
+            const string prefabPath = "Assets/kitchen/LoginBackgroundGrid.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                return null;
+            }
+
+            var background = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            background.name = "LoginBackgroundRoot";
+            background.transform.position = Vector3.zero;
+            return background;
         }
 
         private static LoginUI CreateLoginPanel(Transform parent)
         {
-            var panel = CreatePanel<LoginUI>(parent, "LoginPanel");
-            CreateTitle(panel.transform, "胡闹厨房 MVP");
+            var panel = CreatePixelPanel<LoginUI>(parent, "LoginPanel", 460, 310);
+            var title = CreateTitle(panel.transform, "胡闹厨房 MVP");
+            title.color = new Color(1f, 0.92f, 0.62f);
             var input = CreateInput(panel.transform, "用户名");
             var message = CreateText(panel.transform, string.Empty);
-            var button = CreateButton(panel.transform, "进入游戏");
+            var button = CreatePrefabButton(panel.transform, "Assets/prefab/UI/进入游戏Button.prefab", "进入游戏");
             Assign(panel, "usernameInput", input);
             Assign(panel, "messageText", message);
             UnityEventTools.AddPersistentListener(button.onClick, panel.Submit);
@@ -123,7 +141,7 @@ namespace CookingSimulator.Editor
 
         private static ModeSelectUI CreateModePanel(Transform parent)
         {
-            var panel = CreatePanel<ModeSelectUI>(parent, "ModePanel");
+            var panel = CreatePixelPanel<ModeSelectUI>(parent, "ModePanel", 500, 300);
             var userInfo = CreateTitle(panel.transform, "模式选择");
             var chefButton = CreateButton(panel.transform, "厨神模式");
             var locked = CreateText(panel.transform, "老八模式：MVP 暂未开放");
@@ -411,6 +429,34 @@ namespace CookingSimulator.Editor
             return panel.AddComponent<T>();
         }
 
+        private static T CreatePixelPanel<T>(Transform parent, string name, float width, float height) where T : MonoBehaviour
+        {
+            var panel = new GameObject(name);
+            panel.transform.SetParent(parent, false);
+            var rect = panel.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(width, height);
+
+            var image = panel.AddComponent<Image>();
+            image.color = new Color(0.08f, 0.07f, 0.06f, 0.86f);
+            var outline = panel.AddComponent<Outline>();
+            outline.effectColor = new Color(0.94f, 0.76f, 0.38f, 1f);
+            outline.effectDistance = new Vector2(4, -4);
+
+            var layout = panel.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(28, 28, 28, 28);
+            layout.spacing = 14;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            return panel.AddComponent<T>();
+        }
+
         private static Text CreateTitle(Transform parent, string text)
         {
             var label = CreateText(parent, text);
@@ -439,14 +485,17 @@ namespace CookingSimulator.Editor
             obj.transform.SetParent(parent, false);
             SetPreferredSize(obj, 420, 48);
             var image = obj.AddComponent<Image>();
-            image.color = Color.white;
+            image.color = new Color(0.96f, 0.9f, 0.72f);
+            var outline = obj.AddComponent<Outline>();
+            outline.effectColor = new Color(0.18f, 0.12f, 0.08f);
+            outline.effectDistance = new Vector2(3, -3);
             var input = obj.AddComponent<InputField>();
             var text = CreateText(obj.transform, string.Empty);
-            text.color = Color.black;
+            text.color = new Color(0.12f, 0.08f, 0.05f);
             text.alignment = TextAnchor.MiddleLeft;
             StretchChild(text.gameObject, 14, 8, -14, -8);
             var hint = CreateText(obj.transform, placeholder);
-            hint.color = Color.gray;
+            hint.color = new Color(0.45f, 0.34f, 0.24f);
             hint.alignment = TextAnchor.MiddleLeft;
             StretchChild(hint.gameObject, 14, 8, -14, -8);
             input.textComponent = text;
@@ -465,11 +514,58 @@ namespace CookingSimulator.Editor
             obj.transform.SetParent(parent, false);
             SetPreferredSize(obj, width, 48);
             var image = obj.AddComponent<Image>();
-            image.color = new Color(0.2f, 0.45f, 0.8f);
+            image.color = new Color(0.56f, 0.28f, 0.13f);
             var button = obj.AddComponent<Button>();
+            var colors = button.colors;
+            colors.normalColor = new Color(0.56f, 0.28f, 0.13f);
+            colors.highlightedColor = new Color(0.72f, 0.39f, 0.18f);
+            colors.pressedColor = new Color(0.32f, 0.16f, 0.08f);
+            colors.selectedColor = colors.highlightedColor;
+            button.colors = colors;
+            var outline = obj.AddComponent<Outline>();
+            outline.effectColor = new Color(0.15f, 0.08f, 0.04f);
+            outline.effectDistance = new Vector2(3, -3);
             var label = CreateText(obj.transform, text);
             label.fontSize = 24;
+            label.color = new Color(1f, 0.94f, 0.72f);
             StretchChild(label.gameObject, 0, 0, 0, 0);
+            return button;
+        }
+
+        private static Button CreatePrefabButton(Transform parent, string prefabPath, string text)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                return CreateButton(parent, text);
+            }
+
+            var obj = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (obj == null)
+            {
+                return CreateButton(parent, text);
+            }
+
+            obj.transform.SetParent(parent, false);
+            obj.name = text + "Button";
+
+            var button = obj.GetComponent<Button>() ?? obj.AddComponent<Button>();
+            button.onClick.RemoveAllListeners();
+            for (var index = button.onClick.GetPersistentEventCount() - 1; index >= 0; index--)
+            {
+                UnityEventTools.RemovePersistentListener(button.onClick, index);
+            }
+
+            var label = obj.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.text = text;
+            }
+
+            var layout = obj.GetComponent<LayoutElement>() ?? obj.AddComponent<LayoutElement>();
+            layout.preferredWidth = 260;
+            layout.preferredHeight = 48;
+            layout.minHeight = 48;
             return button;
         }
 
