@@ -152,14 +152,28 @@ namespace CookingSimulator.Editor
 
         private static ModeSelectUI CreateModePanel(Transform parent)
         {
-            var panel = CreatePixelPanel<ModeSelectUI>(parent, "ModePanel", 500, 300);
-            var userInfo = CreateTitle(panel.transform, "模式选择");
-            var chefButton = CreateButton(panel.transform, "厨神模式");
-            var locked = CreateText(panel.transform, "老八模式：MVP 暂未开放");
-            Assign(panel, "userInfoText", userInfo);
-            Assign(panel, "lockedText", locked);
-            UnityEventTools.AddPersistentListener(chefButton.onClick, panel.EnterChefMode);
-            return panel;
+            const string prefabPath = "Assets/prefab/UI/ModePanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
+            }
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab, parent) as GameObject;
+            if (instance == null)
+            {
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
+            }
+
+            instance.name = "ModePanel";
+
+            var modeUI = instance.GetComponent<ModeSelectUI>();
+            if (modeUI == null)
+            {
+                throw new InvalidOperationException("ModePanel prefab must have ModeSelectUI component.");
+            }
+
+            return modeUI;
         }
 
         private static RecipeSelectUI CreateRecipePanel(Transform parent)

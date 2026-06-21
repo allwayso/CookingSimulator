@@ -242,19 +242,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 7645935787924830060}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 8210740209342605249}
-        m_TargetAssemblyTypeName: CookingSimulator.UI.ModeSelectUI, Assembly-CSharp
-        m_MethodName: 
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &8864669025703655000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -502,7 +490,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   userInfoText: {fileID: 2513341444336250326}
-  lockedText: {fileID: 0}
 --- !u!1 &4392001250705334657
 GameObject:
   m_ObjectHideFlags: 0
