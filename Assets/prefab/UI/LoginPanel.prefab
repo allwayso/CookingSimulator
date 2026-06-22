@@ -35,10 +35,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 307611346198687547}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 260, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 230, y: -340.2551}
+  m_SizeDelta: {x: 260, y: 62.5102}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &7418542505374353374
 MonoBehaviour:
@@ -235,7 +235,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: c9d618770623dff4ebcfffca2bc1eb8b, type: 3}
+    m_Font: {fileID: 12800000, guid: 6715aef275357cd4985c5eb475dff821, type: 3}
     m_FontSize: 24
     m_FontStyle: 1
     m_BestFit: 0
@@ -247,7 +247,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Enter the Chief's Name
+  m_Text: Enter your name
 --- !u!1 &970203040506070809
 GameObject:
   m_ObjectHideFlags: 0
@@ -281,10 +281,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 307611346198687547}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 420, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 235.62634, y: -275.69702}
+  m_SizeDelta: {x: 471.2527, y: 51.4395}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &980203040506070809
 CanvasRenderer:
@@ -319,7 +319,7 @@ MonoBehaviour:
     m_FontSize: 22
     m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 1
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -381,10 +381,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 307611346198687547}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 760, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 230, y: -91.72455}
+  m_SizeDelta: {x: 760, y: 127.4491}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1623796812872665480
 CanvasRenderer:
@@ -427,9 +427,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'Cook Till I Die
-
-    (mvp)'
+  m_Text: Cook Till I Die
 --- !u!114 &4031451215336700794
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -460,7 +458,6 @@ GameObject:
   m_Component:
   - component: {fileID: 307611346198687547}
   - component: {fileID: 514968854968848380}
-  - component: {fileID: 538434820610790804}
   - component: {fileID: 559274323988282737}
   m_Layer: 0
   m_Name: LoginPanel
@@ -500,32 +497,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5493852020974285877}
   m_CullTransparentMesh: 1
---- !u!114 &538434820610790804
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5493852020974285877}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_Padding:
-    m_Left: 28
-    m_Right: 28
-    m_Top: 28
-    m_Bottom: 28
-  m_ChildAlignment: 1
-  m_Spacing: 14
-  m_ChildForceExpandWidth: 0
-  m_ChildForceExpandHeight: 0
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 1
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &559274323988282737
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -577,10 +548,10 @@ RectTransform:
   - {fileID: 3564239771822245201}
   m_Father: {fileID: 307611346198687547}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 420, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 230, y: -208}
+  m_SizeDelta: {x: 271.9137, y: 65.86}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &5629742128029686152
 MonoBehaviour:
