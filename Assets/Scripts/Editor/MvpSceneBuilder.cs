@@ -121,7 +121,6 @@ namespace CookingSimulator.Editor
 
             var background = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
             background.name = "LoginBackgroundRoot";
-            background.transform.position = Vector3.zero;
             return background;
         }
 
