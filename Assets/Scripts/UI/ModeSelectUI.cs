@@ -8,7 +8,6 @@ namespace CookingSimulator.UI
     public class ModeSelectUI : MonoBehaviour
     {
         [SerializeField] private Text userInfoText;
-        [SerializeField] private Text lockedText;
 
         private Action onChefMode;
 
@@ -16,8 +15,7 @@ namespace CookingSimulator.UI
         {
             onChefMode = chefModeAction;
             gameObject.SetActive(true);
-            userInfoText.text = $"{user.username}  声望：{user.reputation}";
-            lockedText.text = "老八模式：MVP 暂未开放";
+            userInfoText.text = $"{user.username}, you've still got {user.reputation} reputation points to squander";
         }
 
         public void EnterChefMode()

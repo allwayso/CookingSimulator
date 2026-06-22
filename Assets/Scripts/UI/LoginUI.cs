@@ -23,7 +23,7 @@ namespace CookingSimulator.UI
             var username = usernameInput.text.Trim();
             if (string.IsNullOrWhiteSpace(username))
             {
-                messageText.text = "请输入用户名";
+                messageText.text = "Too lazy to set a gamertag huh?";
                 return;
             }
 
