@@ -8,7 +8,8 @@ namespace CookingSimulator.UI
 {
     public class RecipeSelectUI : MonoBehaviour
     {
-        [SerializeField] private Text recipeText;
+        [SerializeField] private Transform recipeButtonRoot;
+        [SerializeField] private Button recipeButtonTemplate;
 
         private List<RecipeData> recipes;
         private Action<RecipeData> onRecipeSelected;
@@ -20,22 +21,43 @@ namespace CookingSimulator.UI
             onRecipeSelected = recipeSelectedAction;
             onOpenMenu = openMenuAction;
             gameObject.SetActive(true);
-            recipeText.text = recipes.Count == 0 ? "没有可用菜谱" : $"{recipes[0].name}\n{recipes[0].description}";
-        }
 
-        public void SelectFirstRecipe()
-        {
+            ClearRecipeButtons();
+
             if (recipes == null || recipes.Count == 0)
-            {
                 return;
-            }
 
-            onRecipeSelected?.Invoke(recipes[0]);
+            foreach (var recipe in recipes)
+            {
+                var button = Instantiate(recipeButtonTemplate, recipeButtonRoot);
+                button.gameObject.SetActive(true);
+                var label = button.GetComponentInChildren<Text>();
+                if (label != null)
+                    label.text = recipe.name;
+                button.onClick.AddListener(() => onRecipeSelected?.Invoke(recipe));
+            }
         }
 
         public void OpenMenu()
         {
             onOpenMenu?.Invoke();
+        }
+
+        private void ClearRecipeButtons()
+        {
+            if (recipeButtonTemplate != null)
+                recipeButtonTemplate.gameObject.SetActive(false);
+
+            if (recipeButtonRoot == null)
+                return;
+
+            for (int i = recipeButtonRoot.childCount - 1; i >= 0; i--)
+            {
+                var child = recipeButtonRoot.GetChild(i);
+                if (recipeButtonTemplate != null && child == recipeButtonTemplate.transform)
+                    continue;
+                Destroy(child.gameObject);
+            }
         }
     }
 }

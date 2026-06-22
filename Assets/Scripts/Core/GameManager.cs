@@ -79,6 +79,52 @@ namespace CookingSimulator.Core
             currentState = after;
             logManager.AddAction(action, target, before, after);
             cookingUI.UpdateState(currentState);
+
+            // Start timed cooking when player puts ingredients in the pan
+            if (action == "put_in_pan" && currentRecipe != null &&
+                currentRecipe.timedPopupDelays != null && currentRecipe.timedPopupDelays.Length == 4)
+            {
+                cookingUI.StartTimedCooking(
+                    currentRecipe.timedPopupDelays,
+                    HandleTimedPopupAction,
+                    LogMissedAction,
+                    CompleteTimedCooking);
+            }
+        }
+
+        public void HandleTimedPopupAction(string action, string target)
+        {
+            var before = currentState;
+            if (!TryApplyAction(action, out var after))
+            {
+                // State transition not valid — still log as missed
+                logManager.AddAction(action, target, before, before);
+                return;
+            }
+
+            currentState = after;
+            logManager.AddAction(action, target, before, after);
+            cookingUI.UpdateState(currentState);
+        }
+
+        public void LogMissedAction(string action, string target)
+        {
+            logManager.AddAction("missed_" + action, target, currentState, currentState);
+        }
+
+        public void CompleteTimedCooking()
+        {
+            currentLog = logManager.Finish(currentState);
+            currentLogPath = saveManager.SaveLog(currentLog);
+            currentReview = reviewManager.CreateLocalReview(currentDishId, currentRecipe, currentLog);
+            saveManager.SaveReview(currentReview);
+
+            currentUser.reputation += currentReview.reputationDelta;
+            saveManager.SaveUser(currentUser);
+            statusBarUI?.Refresh(currentUser);
+
+            reviewUI.Show(currentReview, ShowSaveDish);
+            Hide(cookingUI);
         }
 
         public void FinishCooking()

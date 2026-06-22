@@ -21,6 +21,8 @@ namespace CookingSimulator.Editor
             scene.name = "MVP";
 
             var loginBackground = CreateLoginBackground();
+            var character = CreateCharacter();
+            var fridge = CreateFridge(character != null ? character.transform : null);
             CreateCamera();
             var canvas = CreateCanvas();
             var eventSystem = new GameObject("EventSystem");
@@ -124,6 +126,83 @@ namespace CookingSimulator.Editor
             return background;
         }
 
+        private static GameObject CreateCharacter()
+        {
+            const string spriteSheetPath = "Assets/character/sprite sheet init.png";
+            var subSprites = AssetDatabase.LoadAllAssetsAtPath(spriteSheetPath);
+
+            Sprite FindSprite(string name)
+            {
+                foreach (var s in subSprites)
+                {
+                    if (s != null && s.name == name) return s as Sprite;
+                }
+                return null;
+            }
+
+            var idleSprite   = FindSprite("sprite sheet init_15");
+            var walkFrame12  = FindSprite("sprite sheet init_12");
+            var walkFrame13  = FindSprite("sprite sheet init_13");
+            var walkFrame14  = FindSprite("sprite sheet init_14");
+
+            var character = new GameObject("小人");
+            character.transform.position = new Vector3(-4.5f, -1.06f, 0f);
+            character.transform.localScale = new Vector3(8f, 8f, 1f);
+
+            var sr = character.AddComponent<SpriteRenderer>();
+            sr.sprite = idleSprite;
+
+            var move = character.AddComponent<人物移动>();
+            var moveSO = new SerializedObject(move);
+            moveSO.FindProperty("moveSpeed").floatValue = 5f;
+            moveSO.FindProperty("characterSize").vector2Value = new Vector2(0.16f, 0.23f);
+
+            var walkFramesProp = moveSO.FindProperty("walkFrames");
+            walkFramesProp.arraySize = 4;
+            walkFramesProp.GetArrayElementAtIndex(0).objectReferenceValue = walkFrame12;
+            walkFramesProp.GetArrayElementAtIndex(1).objectReferenceValue = walkFrame13;
+            walkFramesProp.GetArrayElementAtIndex(2).objectReferenceValue = walkFrame14;
+            walkFramesProp.GetArrayElementAtIndex(3).objectReferenceValue = idleSprite;
+            moveSO.FindProperty("idleSprite").objectReferenceValue = idleSprite;
+            moveSO.FindProperty("walkFrameDuration").floatValue = 0.15f;
+            moveSO.ApplyModifiedPropertiesWithoutUndo();
+
+            return character;
+        }
+
+        private static GameObject CreateFridge(Transform playerTransform)
+        {
+            var fridge = new GameObject("Fridge 1 _0");
+            fridge.transform.position = new Vector3(-0.08f, -0.36f, 0f);
+            fridge.transform.localScale = new Vector3(6.25f, 6.25f, 1f);
+
+            var frame0 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/kitchen/Fridge 1 _sprites/Fridge 1 _000.png");
+            var frame1 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/kitchen/Fridge 1 _sprites/Fridge 1 _001.png");
+            var frame2 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/kitchen/Fridge 1 _sprites/Fridge 1 _002.png");
+            var frame3 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/kitchen/Fridge 1 _sprites/Fridge 1 _003.png");
+            var frame4 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/kitchen/Fridge 1 _sprites/Fridge 1 _004.png");
+
+            var sr = fridge.AddComponent<SpriteRenderer>();
+            sr.sprite = frame0;
+
+            var anim = fridge.AddComponent<冰箱动画>();
+            var animSO = new SerializedObject(anim);
+            animSO.FindProperty("player").objectReferenceValue = playerTransform;
+            animSO.FindProperty("triggerDistance").floatValue = 4f;
+            animSO.FindProperty("frameDuration").floatValue = 0.12f;
+
+            var framesProp = animSO.FindProperty("frames");
+            framesProp.arraySize = 5;
+            framesProp.GetArrayElementAtIndex(0).objectReferenceValue = frame0;
+            framesProp.GetArrayElementAtIndex(1).objectReferenceValue = frame1;
+            framesProp.GetArrayElementAtIndex(2).objectReferenceValue = frame2;
+            framesProp.GetArrayElementAtIndex(3).objectReferenceValue = frame3;
+            framesProp.GetArrayElementAtIndex(4).objectReferenceValue = frame4;
+            animSO.ApplyModifiedPropertiesWithoutUndo();
+
+            return fridge;
+        }
+
         private static LoginUI CreateLoginPanel(Transform parent)
         {
             const string prefabPath = "Assets/prefab/UI/LoginPanel.prefab";
@@ -179,11 +258,25 @@ namespace CookingSimulator.Editor
         private static RecipeSelectUI CreateRecipePanel(Transform parent)
         {
             var panel = CreatePanel<RecipeSelectUI>(parent, "RecipePanel");
-            var text = CreateTitle(panel.transform, "菜谱");
-            var button = CreateButton(panel.transform, "开始做菜");
+            var title = CreateTitle(panel.transform, "菜谱");
+
+            // 菜谱按钮容器
+            var recipeButtonRoot = new GameObject("RecipeButtonColumn", typeof(RectTransform));
+            recipeButtonRoot.transform.SetParent(panel.transform, false);
+            SetPreferredSize(recipeButtonRoot, 760, 260);
+            var layout = recipeButtonRoot.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 10;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+
+            // 菜谱按钮模板（默认隐藏）
+            var recipeButtonTemplate = CreateButton(recipeButtonRoot.transform, "菜品模板");
+            recipeButtonTemplate.gameObject.SetActive(false);
+
             var menuButton = CreateButton(panel.transform, "厨神菜单");
-            Assign(panel, "recipeText", text);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.SelectFirstRecipe);
+            Assign(panel, "recipeButtonRoot", recipeButtonRoot.transform);
+            Assign(panel, "recipeButtonTemplate", recipeButtonTemplate);
             UnityEventTools.AddPersistentListener(menuButton.onClick, panel.OpenMenu);
             return panel;
         }
@@ -216,6 +309,12 @@ namespace CookingSimulator.Editor
         {
             var panel = CreatePanel<CookingUI>(parent, "CookingPanel");
             var recipe = CreateTitle(panel.transform, "做菜");
+
+            // Timer text (hidden by default)
+            var timerText = CreateText(panel.transform, "");
+            timerText.fontSize = 28;
+            timerText.gameObject.SetActive(false);
+
             CreateKitchenVisual(panel.transform, out var dishStateImage);
             var state = CreateText(panel.transform, "当前状态");
             var hint = CreateText(panel.transform, "提示");
@@ -225,14 +324,65 @@ namespace CookingSimulator.Editor
             Assign(panel, "hintText", hint);
             Assign(panel, "messageText", message);
             Assign(panel, "dishStateImage", dishStateImage);
+            Assign(panel, "timerText", timerText);
+
             var actions = CreateButtonRow(panel.transform);
+            Assign(panel, "actionButtonRow", actions.transform);
             UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "切菜", 120).onClick, panel.Cut);
             UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "下锅", 120).onClick, panel.PutInPan);
             UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加热", 120).onClick, panel.Heat);
             UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加调料", 120).onClick, panel.Season);
             UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "翻炒", 120).onClick, panel.Stir);
             UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "出锅", 120).onClick, panel.Finish);
+
+            // Timed popup overlay (hidden by default)
+            CreateTimedPopupOverlay(panel.transform, panel);
+
             return panel;
+        }
+
+        private static void CreateTimedPopupOverlay(Transform parent, CookingUI cookingUI)
+        {
+            var overlayObj = new GameObject("TimedPopupOverlay", typeof(RectTransform));
+            overlayObj.transform.SetParent(parent, false);
+            var rect = overlayObj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(420, 200);
+
+            var image = overlayObj.AddComponent<Image>();
+            image.color = new Color(0.08f, 0.07f, 0.06f, 0.92f);
+
+            var outline = overlayObj.AddComponent<Outline>();
+            outline.effectColor = new Color(0.94f, 0.76f, 0.38f, 1f);
+            outline.effectDistance = new Vector2(4, -4);
+
+            // Ignore parent VerticalLayoutGroup so this sits centered on top
+            var ignoreLayout = overlayObj.AddComponent<LayoutElement>();
+            ignoreLayout.ignoreLayout = true;
+
+            var layout = overlayObj.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(28, 28, 28, 28);
+            layout.spacing = 18;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            overlayObj.SetActive(false);
+
+            var questionText = CreateText(overlayObj.transform, "是否加热？");
+            questionText.fontSize = 28;
+            questionText.alignment = TextAnchor.MiddleCenter;
+
+            var yesButton = CreateButton(overlayObj.transform, "是", 160);
+
+            Assign(cookingUI, "popupOverlay", overlayObj);
+            Assign(cookingUI, "popupQuestionText", questionText);
+            Assign(cookingUI, "popupYesButton", yesButton);
         }
 
         private static GameObject CreateButtonRow(Transform parent)
