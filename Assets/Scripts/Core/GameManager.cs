@@ -184,19 +184,17 @@ namespace CookingSimulator.Core
 
         public void ShowReviewerSelection(DishData dish)
         {
-            menuUI.ShowReviewers(dish, ShowMenu, reviewerName =>
+            var profiles = AIReviewService.DiscoverNpcProfiles();
+            menuUI.ShowReviewers(dish, profiles, ShowMenu, profileKey =>
             {
-                if (reviewerName == "AI 老八")
-                {
-                    ShowLaobaReview(dish);
-                }
+                ShowNPCReview(dish, profileKey);
             });
         }
 
-        public void ShowLaobaReview(DishData dish)
+        public void ShowNPCReview(DishData dish, string profileKey)
         {
-            var existingReview = saveManager.LoadReview(dish.reviewId);
-            if (existingReview != null && existingReview.summary.StartsWith("AI 老八评价", StringComparison.Ordinal))
+            var existingReview = saveManager.LoadReviewByDishAndReviewer(dish.dishId, profileKey);
+            if (existingReview != null)
             {
                 reviewUI.Show(existingReview, ShowMenu, "返回食单");
                 Hide(menuUI);
@@ -205,11 +203,11 @@ namespace CookingSimulator.Core
 
             var recipe = LoadRecipeForDish(dish);
             var log = LoadLog(dish.logPath);
-            var baseReview = existingReview ?? reviewManager.CreateLocalLaobaReview(dish);
-            StartCoroutine(aiReviewService.CreateLaobaReview(dish, recipe, log, baseReview, (review, usedAi, error) =>
+            var localReview = saveManager.LoadReview(dish.reviewId);
+            var baseReview = localReview ?? reviewManager.CreateLocalReview(dish.dishId, recipe, log);
+            StartCoroutine(aiReviewService.CreateNPCReview(dish, recipe, log, baseReview, profileKey, (review, usedAi, error) =>
             {
                 saveManager.SaveReview(review);
-                dish.reviewId = review.reviewId;
                 dish.reviewText = review.summary;
                 dish.score = review.score;
                 saveManager.SaveDish(dish);

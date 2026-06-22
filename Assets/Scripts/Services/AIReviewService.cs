@@ -12,22 +12,59 @@ namespace CookingSimulator.Services
     public class AIReviewService : MonoBehaviour
     {
         private const string ConfigFileName = "ai_review.local.json";
-        private const string LaobaProfilePath = "NPCs/ai_laoba.md";
+        private const string NpcProfilesFolder = "NPCs";
 
-        public IEnumerator CreateLaobaReview(
+        private static readonly Dictionary<string, string> NpcDisplayNames = new Dictionary<string, string>
+        {
+            { "laoba", "AI 老八" },
+            { "dagongren", "打工人老八" },
+            { "zibenjia", "资本家老八" },
+            { "baozupo", "包租婆老八" },
+            { "meishijia", "美食家老八" },
+            { "jianshen", "健身达人老八" },
+            { "xiaoxuesheng", "小学生老八" },
+            { "yangsheng", "养生专家老八" },
+        };
+
+        public static string GetNpcDisplayName(string profileKey)
+        {
+            if (NpcDisplayNames.TryGetValue(profileKey, out var name))
+                return name;
+            return string.IsNullOrEmpty(profileKey) ? "Unknown" : char.ToUpper(profileKey[0]) + profileKey.Substring(1);
+        }
+
+        public static List<(string profileKey, string displayName)> DiscoverNpcProfiles()
+        {
+            var result = new List<(string, string)>();
+            var npcDir = Path.Combine(Application.streamingAssetsPath, NpcProfilesFolder);
+            if (!Directory.Exists(npcDir))
+                return result;
+
+            foreach (var path in Directory.GetFiles(npcDir, "*.md"))
+            {
+                var fileName = Path.GetFileNameWithoutExtension(path);
+                var profileKey = fileName.StartsWith("ai_") ? fileName.Substring(3) : fileName;
+                result.Add((profileKey, GetNpcDisplayName(profileKey)));
+            }
+
+            return result;
+        }
+
+        public IEnumerator CreateNPCReview(
             DishData dish,
             RecipeData recipe,
             CookingLog log,
             ReviewData baseReview,
+            string profileKey,
             Action<ReviewData, bool, string> onComplete)
         {
             if (!TryLoadProviders(out var providers, out var configError))
             {
-                onComplete(CreateFallbackReview(dish, baseReview, configError), false, configError);
+                onComplete(CreateFallbackReview(dish, baseReview, profileKey, configError), false, configError);
                 yield break;
             }
 
-            var prompt = BuildPrompt(dish, recipe, log, baseReview, LoadLaobaProfile());
+            var prompt = BuildPrompt(dish, recipe, log, baseReview, LoadNpcProfile(profileKey));
             var responseText = string.Empty;
             var requestError = string.Empty;
             yield return RunProviderRequests(providers, prompt, (response, error) =>
@@ -38,17 +75,27 @@ namespace CookingSimulator.Services
 
             if (!string.IsNullOrWhiteSpace(requestError))
             {
-                onComplete(CreateFallbackReview(dish, baseReview, requestError), false, requestError);
+                onComplete(CreateFallbackReview(dish, baseReview, profileKey, requestError), false, requestError);
                 yield break;
             }
 
-            if (!TryParseReview(dish, responseText, out var review, out var parseError))
+            if (!TryParseReview(dish, responseText, profileKey, out var review, out var parseError))
             {
-                onComplete(CreateFallbackReview(dish, baseReview, parseError), false, parseError);
+                onComplete(CreateFallbackReview(dish, baseReview, profileKey, parseError), false, parseError);
                 yield break;
             }
 
             onComplete(review, true, string.Empty);
+        }
+
+        public IEnumerator CreateLaobaReview(
+            DishData dish,
+            RecipeData recipe,
+            CookingLog log,
+            ReviewData baseReview,
+            Action<ReviewData, bool, string> onComplete)
+        {
+            yield return CreateNPCReview(dish, recipe, log, baseReview, "laoba", onComplete);
         }
 
         public IEnumerator TestConnection(Action<bool, string> onComplete)
@@ -258,10 +305,19 @@ namespace CookingSimulator.Services
             yield return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
         }
 
-        private static string LoadLaobaProfile()
+        private static string LoadNpcProfile(string profileKey)
         {
-            var path = Path.Combine(Application.streamingAssetsPath, LaobaProfilePath);
-            return File.Exists(path) ? File.ReadAllText(path) : "你是 AI 老八，负责用挑剔但有用的方式评价菜品。";
+            var folder = Path.Combine(Application.streamingAssetsPath, NpcProfilesFolder);
+            var path = Path.Combine(folder, profileKey + ".md");
+            if (File.Exists(path))
+                return File.ReadAllText(path);
+
+            var legacyPath = Path.Combine(folder, "ai_" + profileKey + ".md");
+            if (File.Exists(legacyPath))
+                return File.ReadAllText(legacyPath);
+
+            var displayName = GetNpcDisplayName(profileKey);
+            return $"你是 {displayName}，负责用挑剔但有用的方式评价菜品。";
         }
 
         private static string BuildChatCompletionsUrl(string baseUrl)
@@ -297,7 +353,7 @@ namespace CookingSimulator.Services
             return builder.ToString();
         }
 
-        private static bool TryParseReview(DishData dish, string responseText, out ReviewData review, out string error)
+        private static bool TryParseReview(DishData dish, string responseText, string profileKey, out ReviewData review, out string error)
         {
             review = null;
             error = string.Empty;
@@ -314,12 +370,14 @@ namespace CookingSimulator.Services
                     return false;
                 }
 
+                var displayName = GetNpcDisplayName(profileKey);
                 review = new ReviewData
                 {
                     reviewId = Guid.NewGuid().ToString("N"),
                     dishId = dish.dishId,
+                    reviewerId = profileKey,
                     score = Mathf.Clamp(payload.score, 0, 100),
-                    summary = "AI 老八评价：" + payload.summary,
+                    summary = displayName + "评价：" + payload.summary,
                     suggestion = payload.suggestion,
                     reputationDelta = Mathf.Clamp(payload.reputationDelta, -5, 5),
                     createdAt = DateTime.UtcNow.ToString("O")
@@ -345,14 +403,16 @@ namespace CookingSimulator.Services
             return start >= 0 && end > start ? value.Substring(start, end - start + 1) : value;
         }
 
-        private static ReviewData CreateFallbackReview(DishData dish, ReviewData baseReview, string reason)
+        private static ReviewData CreateFallbackReview(DishData dish, ReviewData baseReview, string profileKey, string reason)
         {
+            var displayName = GetNpcDisplayName(profileKey);
             return new ReviewData
             {
                 reviewId = Guid.NewGuid().ToString("N"),
                 dishId = dish.dishId,
+                reviewerId = profileKey,
                 score = baseReview.score,
-                summary = $"AI 老八暂时没连上，先按本地规则评价：{baseReview.summary}",
+                summary = $"{displayName}暂时没连上，先按本地规则评价：{baseReview.summary}",
                 suggestion = baseReview.suggestion + "（AI 降级原因：" + reason + "）",
                 reputationDelta = baseReview.reputationDelta,
                 createdAt = DateTime.UtcNow.ToString("O")
