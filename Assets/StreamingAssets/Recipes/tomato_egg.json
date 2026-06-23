@@ -21,7 +21,7 @@
       "order": 3,
       "action": "heat",
       "target": "锅",
-      "hint": "开火加热。"
+      "hint": "调节火力控制成熟度，注意番茄和鸡蛋熟度不同。"
     },
     {
       "order": 4,
@@ -41,5 +41,9 @@
       "target": "菜品",
       "hint": "完成后出锅。"
     }
+  ],
+  "ingredientCookingConfigs": [
+    { "ingredientName": "番茄", "fullCookThreshold": 120 },
+    { "ingredientName": "鸡蛋", "fullCookThreshold": 40 }
   ]
 }

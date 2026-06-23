@@ -235,7 +235,207 @@ namespace CookingSimulator.Editor
                 throw new InvalidOperationException("CookingPanel prefab must have CookingUI component.");
             }
 
+            // 移除 prefab 中的旧"加热"按钮（火力现由滑杆控制）
+            RemoveHeatButton(instance.transform);
+
+            // 计时器（左上角）
+            var timerText = CreateTimerLabel(instance.transform);
+            Assign(cookingUI, "timerText", timerText);
+
+            // 在 prefab 基础上添加食材熟度显示和火力滑杆
+            CreateDonenessRow(instance.transform, out var tomatoImage, out var eggImage,
+                out var tomatoText, out var eggText);
+            Assign(cookingUI, "tomatoDonenessImage", tomatoImage);
+            Assign(cookingUI, "eggDonenessImage", eggImage);
+            Assign(cookingUI, "tomatoDonenessText", tomatoText);
+            Assign(cookingUI, "eggDonenessText", eggText);
+
+            CreateFireControlRow(instance.transform, out var fireSlider, out var fireLevelText);
+            Assign(cookingUI, "fireSlider", fireSlider);
+            Assign(cookingUI, "fireLevelText", fireLevelText);
+            UnityEventTools.AddPersistentListener(fireSlider.onValueChanged, cookingUI.OnFireSliderChanged);
+
             return cookingUI;
+        }
+
+        /// <summary>
+        /// 在 prefab 实例中查找并移除"加热"按钮（CookingUI.Heat() 已删除，由火力滑杆替代）
+        /// </summary>
+        private static void RemoveHeatButton(Transform root)
+        {
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name.Contains("加热"))
+                {
+                    UnityEngine.Object.DestroyImmediate(child.gameObject);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 创建左上角烹饪计时器
+        /// </summary>
+        private static Text CreateTimerLabel(Transform parent)
+        {
+            var timerObj = new GameObject("TimerText", typeof(RectTransform));
+            timerObj.transform.SetParent(parent, false);
+            var rect = timerObj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(0, 1);
+            rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(16, -16);
+            rect.sizeDelta = new Vector2(160, 40);
+            var text = timerObj.AddComponent<Text>();
+            text.text = "⏱ 00:00";
+            text.fontSize = 28;
+            text.color = new Color(0.95f, 0.88f, 0.56f);
+            text.alignment = TextAnchor.MiddleLeft;
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            return text;
+        }
+
+        private static void CreateDonenessRow(Transform parent,
+            out Image tomatoImage, out Image eggImage,
+            out Text tomatoText, out Text eggText)
+        {
+            var row = new GameObject("IngredientDoneness", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            SetPreferredSize(row, 760, 64);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 40;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            // 番茄熟度组
+            var tomatoGroup = new GameObject("TomatoGroup", typeof(RectTransform));
+            tomatoGroup.transform.SetParent(row.transform, false);
+            SetPreferredSize(tomatoGroup, 240, 56);
+            var tomatoGroupLayout = tomatoGroup.AddComponent<HorizontalLayoutGroup>();
+            tomatoGroupLayout.spacing = 8;
+            tomatoGroupLayout.childAlignment = TextAnchor.MiddleCenter;
+            tomatoGroupLayout.childControlWidth = false;
+            tomatoGroupLayout.childControlHeight = false;
+            tomatoGroupLayout.childForceExpandWidth = false;
+            tomatoGroupLayout.childForceExpandHeight = false;
+
+            var tomatoImgObj = new GameObject("TomatoImage", typeof(RectTransform));
+            tomatoImgObj.transform.SetParent(tomatoGroup.transform, false);
+            SetPreferredSize(tomatoImgObj, 48, 48);
+            tomatoImage = tomatoImgObj.AddComponent<Image>();
+            tomatoImage.color = new Color(0.82f, 0.25f, 0.2f);
+
+            tomatoText = CreateText(tomatoGroup.transform, "番茄: 全生");
+            tomatoText.fontSize = 20;
+            var tomatoTextRect = tomatoText.GetComponent<RectTransform>();
+            tomatoTextRect.sizeDelta = new Vector2(172, 32);
+
+            // 鸡蛋熟度组
+            var eggGroup = new GameObject("EggGroup", typeof(RectTransform));
+            eggGroup.transform.SetParent(row.transform, false);
+            SetPreferredSize(eggGroup, 240, 56);
+            var eggGroupLayout = eggGroup.AddComponent<HorizontalLayoutGroup>();
+            eggGroupLayout.spacing = 8;
+            eggGroupLayout.childAlignment = TextAnchor.MiddleCenter;
+            eggGroupLayout.childControlWidth = false;
+            eggGroupLayout.childControlHeight = false;
+            eggGroupLayout.childForceExpandWidth = false;
+            eggGroupLayout.childForceExpandHeight = false;
+
+            var eggImgObj = new GameObject("EggImage", typeof(RectTransform));
+            eggImgObj.transform.SetParent(eggGroup.transform, false);
+            SetPreferredSize(eggImgObj, 48, 48);
+            eggImage = eggImgObj.AddComponent<Image>();
+            eggImage.color = new Color(0.95f, 0.88f, 0.56f);
+
+            eggText = CreateText(eggGroup.transform, "鸡蛋: 全生");
+            eggText.fontSize = 20;
+            var eggTextRect = eggText.GetComponent<RectTransform>();
+            eggTextRect.sizeDelta = new Vector2(172, 32);
+        }
+
+        private static void CreateFireControlRow(Transform parent,
+            out Slider fireSlider, out Text fireLevelText)
+        {
+            var row = new GameObject("FireControl", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            SetPreferredSize(row, 760, 56);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 16;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            // 标签
+            var label = CreateText(row.transform, "火力");
+            label.fontSize = 22;
+            label.GetComponent<RectTransform>().sizeDelta = new Vector2(60, 32);
+
+            // 滑杆
+            var sliderObj = new GameObject("FireSlider", typeof(RectTransform));
+            sliderObj.transform.SetParent(row.transform, false);
+            SetPreferredSize(sliderObj, 300, 32);
+
+            // 滑杆背景
+            var sliderBg = sliderObj.AddComponent<Image>();
+            sliderBg.color = new Color(0.25f, 0.18f, 0.12f);
+
+            fireSlider = sliderObj.AddComponent<Slider>();
+            fireSlider.minValue = 0;
+            fireSlider.maxValue = 4;
+            fireSlider.wholeNumbers = true;
+            fireSlider.value = 0;
+            fireSlider.interactable = false;
+            fireSlider.direction = Slider.Direction.LeftToRight;
+
+            // 滑杆填充区域
+            var fillArea = new GameObject("Fill Area", typeof(RectTransform));
+            fillArea.transform.SetParent(sliderObj.transform, false);
+            var fillAreaRect = fillArea.GetComponent<RectTransform>();
+            fillAreaRect.anchorMin = new Vector2(0, 0.25f);
+            fillAreaRect.anchorMax = new Vector2(1, 0.75f);
+            fillAreaRect.offsetMin = Vector2.zero;
+            fillAreaRect.offsetMax = Vector2.zero;
+            var fill = new GameObject("Fill", typeof(RectTransform));
+            fill.transform.SetParent(fillArea.transform, false);
+            var fillRect = fill.GetComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            var fillImage = fill.AddComponent<Image>();
+            fillImage.color = new Color(0.95f, 0.42f, 0.18f);
+            fireSlider.fillRect = fillRect;
+            fireSlider.targetGraphic = fillImage;
+
+            // 滑杆手柄
+            var handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
+            handleArea.transform.SetParent(sliderObj.transform, false);
+            var handleAreaRect = handleArea.GetComponent<RectTransform>();
+            handleAreaRect.anchorMin = Vector2.zero;
+            handleAreaRect.anchorMax = Vector2.one;
+            handleAreaRect.offsetMin = Vector2.zero;
+            handleAreaRect.offsetMax = Vector2.zero;
+            var handle = new GameObject("Handle", typeof(RectTransform));
+            handle.transform.SetParent(handleArea.transform, false);
+            var handleRect = handle.GetComponent<RectTransform>();
+            handleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            handleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            handleRect.sizeDelta = new Vector2(24, 40);
+            var handleImage = handle.AddComponent<Image>();
+            handleImage.color = new Color(0.95f, 0.6f, 0.2f);
+            fireSlider.handleRect = handleRect;
+
+            // 火力档位文字
+            fireLevelText = CreateText(row.transform, "关火");
+            fireLevelText.fontSize = 22;
+            fireLevelText.color = new Color(0.95f, 0.42f, 0.18f);
+            fireLevelText.GetComponent<RectTransform>().sizeDelta = new Vector2(72, 32);
         }
 
         private static ReviewUI CreateReviewPanel(Transform parent)

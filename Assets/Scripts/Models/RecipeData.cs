@@ -11,6 +11,7 @@ namespace CookingSimulator.Models
         public string[] ingredients;
         public string[] seasonings;
         public RecipeStep[] steps;
+        public IngredientCookingConfig[] ingredientCookingConfigs;
     }
 
     [Serializable]

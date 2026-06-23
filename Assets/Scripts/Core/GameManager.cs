@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using CookingSimulator.Models;
 using CookingSimulator.Services;
@@ -35,6 +36,13 @@ namespace CookingSimulator.Core
         private string currentDishId;
         private string currentLogPath;
 
+        // 火力 & 熟度系统
+        private int currentFireLevel;
+        private float cookingElapsed;
+        private Dictionary<string, IngredientCookState> ingredientStates;
+        private IngredientCookingConfig[] currentCookConfigs;
+        private Coroutine cookingCoroutine;
+
         private void Start()
         {
             ShowLogin();
@@ -62,8 +70,27 @@ namespace CookingSimulator.Core
             currentRecipe = recipe;
             currentDishId = Guid.NewGuid().ToString("N");
             currentState = DishState.Raw;
+            currentFireLevel = 0;
+
+            // 初始化食材熟度追踪
+            ingredientStates = new Dictionary<string, IngredientCookState>();
+            currentCookConfigs = recipe.ingredientCookingConfigs ?? Array.Empty<IngredientCookingConfig>();
+
+            Debug.Log($"[Cooking] 菜谱: {recipe.name}, 食材配置 {currentCookConfigs.Length} 个");
+            foreach (var config in currentCookConfigs)
+            {
+                ingredientStates[config.ingredientName] = new IngredientCookState
+                {
+                    ingredientName = config.ingredientName,
+                    cookProgress = 0f,
+                    doneness = DonenessLevel.Raw
+                };
+                Debug.Log($"[Cooking] 食材: {config.ingredientName}, 全熟阈值: {config.fullCookThreshold}");
+            }
+
             logManager.StartLog(currentUser, currentRecipe, currentDishId);
-            cookingUI.Show(currentRecipe, currentState, HandleCookingAction, FinishCooking);
+            cookingUI.Show(currentRecipe, currentState,
+                HandleCookingAction, FinishCooking, HandleFireLevelChanged);
             Hide(recipeSelectUI);
         }
 
@@ -77,14 +104,51 @@ namespace CookingSimulator.Core
             }
 
             currentState = after;
+
+            // 进入 Cooking 状态时启动协程（必须在 currentState 更新之后）
+            if (after == DishState.Cooking)
+            {
+                cookingCoroutine = StartCoroutine(CookingCoroutine());
+            }
+            // 离开 Cooking 状态时停止协程
+            else if (before == DishState.Cooking && after != DishState.Cooking)
+            {
+                if (cookingCoroutine != null)
+                {
+                    StopCoroutine(cookingCoroutine);
+                    cookingCoroutine = null;
+                }
+            }
+
             logManager.AddAction(action, target, before, after);
             cookingUI.UpdateState(currentState);
+        }
+
+        public void HandleFireLevelChanged(int level)
+        {
+            currentFireLevel = level;
         }
 
         public void FinishCooking()
         {
             HandleCookingAction("finish", "菜品");
             currentLog = logManager.Finish(currentState);
+
+            // 记录最终食材熟度到日志
+            if (ingredientStates != null && ingredientStates.Count > 0)
+            {
+                currentLog.ingredientResults = new List<IngredientCookState>();
+                foreach (var kvp in ingredientStates)
+                {
+                    currentLog.ingredientResults.Add(new IngredientCookState
+                    {
+                        ingredientName = kvp.Value.ingredientName,
+                        cookProgress = kvp.Value.cookProgress,
+                        doneness = kvp.Value.doneness
+                    });
+                }
+            }
+
             currentLogPath = saveManager.SaveLog(currentLog);
             currentReview = reviewManager.CreateLocalReview(currentDishId, currentRecipe, currentLog);
             saveManager.SaveReview(currentReview);
@@ -193,6 +257,7 @@ namespace CookingSimulator.Core
         private bool TryApplyAction(string action, out DishState nextState)
         {
             nextState = currentState;
+
             if (action == "cut" && currentState == DishState.Raw)
             {
                 nextState = DishState.Cut;
@@ -205,10 +270,8 @@ namespace CookingSimulator.Core
                 return true;
             }
 
-            if (action == "heat" && currentState == DishState.Cooking)
-            {
-                return true;
-            }
+            // "heat" 动作已移除 —— 火力由滑杆实时控制，不再通过按钮触发
+            // 保留状态检查以兼容旧日志/步骤，但不做任何操作
 
             if (action == "season" && currentState == DishState.Cooking)
             {
@@ -228,6 +291,69 @@ namespace CookingSimulator.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 烹饪协程：每帧根据火力累积食材烹饪进度，检测熟度变化并更新 UI
+        /// </summary>
+        private IEnumerator CookingCoroutine()
+        {
+            cookingElapsed = 0f;
+            Debug.Log($"[Cooking] 协程启动, 火力={currentFireLevel}, 食材数={ingredientStates?.Count ?? 0}, 配置数={currentCookConfigs?.Length ?? 0}");
+
+            while (currentState == DishState.Cooking)
+            {
+                cookingElapsed += Time.deltaTime;
+                cookingUI.UpdateTimer(cookingElapsed);
+
+                if (currentFireLevel > 0 && ingredientStates != null)
+                {
+                    float delta = Time.deltaTime * currentFireLevel;
+
+                    foreach (var config in currentCookConfigs)
+                    {
+                        if (!ingredientStates.TryGetValue(config.ingredientName, out var state))
+                        {
+                            Debug.LogWarning($"[Cooking] 找不到食材状态: {config.ingredientName}");
+                            continue;
+                        }
+
+                        state.cookProgress += delta;
+                        var newDoneness = CalculateDoneness(state.cookProgress, config.fullCookThreshold);
+
+                        if (newDoneness != state.doneness)
+                        {
+                            state.doneness = newDoneness;
+                            Debug.Log($"[Cooking] {config.ingredientName} 熟度变化: {newDoneness} (进度={state.cookProgress:F1}/{config.fullCookThreshold})");
+                            cookingUI.UpdateIngredientDoneness(config.ingredientName, newDoneness);
+                        }
+                    }
+                }
+
+                yield return null;
+            }
+
+            Debug.Log($"[Cooking] 协程结束, 总烹饪时间={cookingElapsed:F1}s");
+        }
+
+        /// <summary>
+        /// 根据烹饪进度和全熟阈值计算当前熟度等级
+        /// 阈值划分：0-25% 全生 / 25%-62.5% 半生 / 62.5%-100% 全熟 / >100% 过头
+        /// </summary>
+        private static DonenessLevel CalculateDoneness(float progress, float fullThreshold)
+        {
+            if (fullThreshold <= 0f)
+                return DonenessLevel.FullyCooked;
+
+            float ratio = progress / fullThreshold;
+
+            if (ratio < 0.25f)
+                return DonenessLevel.Raw;
+            if (ratio < 0.625f)
+                return DonenessLevel.HalfCooked;
+            if (ratio <= 1.0f)
+                return DonenessLevel.FullyCooked;
+            return DonenessLevel.Overcooked;
         }
 
         private RecipeData LoadRecipeForDish(DishData dish)
@@ -252,7 +378,8 @@ namespace CookingSimulator.Core
                 description = string.Empty,
                 ingredients = Array.Empty<string>(),
                 seasonings = Array.Empty<string>(),
-                steps = Array.Empty<RecipeStep>()
+                steps = Array.Empty<RecipeStep>(),
+                ingredientCookingConfigs = Array.Empty<IngredientCookingConfig>()
             };
         }
 
