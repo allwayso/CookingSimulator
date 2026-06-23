@@ -224,18 +224,9 @@ namespace CookingSimulator.Core
             currentReview = reviewManager.CreateLocalReview(currentDishId, currentRecipe, currentLog);
             saveManager.SaveReview(currentReview);
 
-            currentUser.reputation += currentReview.reputationDelta;
-            saveManager.SaveUser(currentUser);
-            statusBarUI?.Refresh(currentUser);
-
-            reviewUI.Show(currentReview, ShowSaveDish);
-            Hide(cookingUI);
-        }
-
-        public void ShowSaveDish()
-        {
+            // 直接进入保存界面（AI评价在保存时并行请求）
             saveDishUI.Show(currentReview, SaveDish);
-            Hide(reviewUI);
+            Hide(cookingUI);
         }
 
         public void SaveDish(string dishName, float price)
@@ -254,13 +245,61 @@ namespace CookingSimulator.Core
                 createdAt = DateTime.UtcNow.ToString("O")
             };
             saveManager.SaveDish(dish);
-            ShowMenu();
+            Hide(saveDishUI);
+
+            // 加载 NPC 列表，并行请求 AI 评价
+            var npcs = AIReviewService.LoadNPCs();
+            if (npcs.Count == 0)
+            {
+                // 没有 NPC 配置，直接展示本地评价
+                currentUser.reputation += currentReview.reputationDelta;
+                saveManager.SaveUser(currentUser);
+                statusBarUI?.Refresh(currentUser);
+                reviewUI.Show(currentReview, ShowMenu);
+                return;
+            }
+
+            StartCoroutine(BatchAIReview(dish, npcs));
+        }
+
+        private IEnumerator BatchAIReview(DishData dish, List<NPCData> npcs)
+        {
+            var recipe = currentRecipe;
+            var log = LoadLog(dish.logPath);
+
+            yield return aiReviewService.CreateBatchReviews(dish, recipe, log, currentReview, npcs, reviews =>
+            {
+                // 保存所有 AI 评价
+                foreach (var review in reviews)
+                {
+                    saveManager.SaveReview(review);
+                }
+
+                // 取平均分更新菜品
+                var avgScore = 0;
+                foreach (var r in reviews) avgScore += r.score;
+                avgScore /= reviews.Count;
+
+                dish.score = avgScore;
+                dish.reviewId = reviews[0].reviewId;
+                dish.reviewText = reviews[0].summary;
+                saveManager.SaveDish(dish);
+
+                // 综合声望变化
+                var totalDelta = 0;
+                foreach (var r in reviews) totalDelta += r.reputationDelta;
+                currentUser.reputation += totalDelta;
+                saveManager.SaveUser(currentUser);
+                statusBarUI?.Refresh(currentUser);
+
+                reviewUI.ShowMultiple(reviews, ShowMenu);
+            });
         }
 
         public void ShowMenu()
         {
             var dishes = saveManager.LoadDishes(currentUser.userId);
-            menuUI.ShowDishes(dishes, EnterChefMode, ShowReviewerSelection);
+            menuUI.ShowDishes(dishes, EnterChefMode);
             Hide(saveDishUI);
             Hide(reviewUI);
         }
@@ -269,47 +308,6 @@ namespace CookingSimulator.Core
         {
             ShowMenu();
             Hide(recipeSelectUI);
-        }
-
-        public void ShowReviewerSelection(DishData dish)
-        {
-            menuUI.ShowReviewers(dish, ShowMenu, reviewerName =>
-            {
-                if (reviewerName == "AI 老八")
-                {
-                    ShowLaobaReview(dish);
-                }
-            });
-        }
-
-        public void ShowLaobaReview(DishData dish)
-        {
-            var existingReview = saveManager.LoadReview(dish.reviewId);
-            if (existingReview != null && existingReview.summary.StartsWith("AI 老八评价", StringComparison.Ordinal))
-            {
-                reviewUI.Show(existingReview, ShowMenu, "返回食单");
-                Hide(menuUI);
-                return;
-            }
-
-            var recipe = LoadRecipeForDish(dish);
-            var log = LoadLog(dish.logPath);
-            var baseReview = existingReview ?? reviewManager.CreateLocalLaobaReview(dish);
-            StartCoroutine(aiReviewService.CreateLaobaReview(dish, recipe, log, baseReview, (review, usedAi, error) =>
-            {
-                saveManager.SaveReview(review);
-                dish.reviewId = review.reviewId;
-                dish.reviewText = review.summary;
-                dish.score = review.score;
-                saveManager.SaveDish(dish);
-
-                currentUser.reputation += review.reputationDelta;
-                saveManager.SaveUser(currentUser);
-                statusBarUI?.Refresh(currentUser);
-
-                reviewUI.Show(review, ShowMenu, "返回食单");
-                Hide(menuUI);
-            }));
         }
 
         private void ShowLogin()

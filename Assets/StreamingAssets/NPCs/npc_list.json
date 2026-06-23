@@ -1,0 +1,6 @@
+[
+  { "id": "laoba",  "name": "老八",    "personaFile": "ai_laoba.md" },
+  { "id": "kunkun", "name": "坤坤",    "personaFile": "ai_kunkun.md" },
+  { "id": "guabi",  "name": "挂壁大神", "personaFile": "ai_guabi.md" },
+  { "id": "mamba",  "name": "曼巴",    "personaFile": "ai_mamba.md" }
+]

@@ -629,11 +629,33 @@ namespace CookingSimulator.Editor
         {
             var panel = CreatePanel<ReviewUI>(parent, "ReviewPanel");
             CreateTitle(panel.transform, "评价");
+
+            // 翻页行
+            var navRow = new GameObject("NavRow", typeof(RectTransform));
+            navRow.transform.SetParent(panel.transform, false);
+            SetPreferredSize(navRow, 760, 40);
+            var navLayout = navRow.AddComponent<HorizontalLayoutGroup>();
+            navLayout.spacing = 20;
+            navLayout.childAlignment = TextAnchor.MiddleCenter;
+            navLayout.childControlWidth = false;
+            navLayout.childControlHeight = true;
+
+            var prevBtn = CreateButton(navRow.transform, "<", 80);
+            var pageText = CreateText(navRow.transform, "1/1");
+            pageText.fontSize = 20;
+            pageText.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 32);
+            var nextBtn = CreateButton(navRow.transform, ">", 80);
+
             var text = CreateScrollableTextArea(panel.transform);
-            var button = CreateButton(panel.transform, "保存菜品");
+            var button = CreateButton(panel.transform, "返回食单");
             var buttonText = button.GetComponentInChildren<Text>();
+            Assign(panel, "prevButton", prevBtn);
+            Assign(panel, "nextButton", nextBtn);
+            Assign(panel, "pageIndicator", pageText);
             Assign(panel, "reviewText", text);
             Assign(panel, "continueButtonText", buttonText);
+            UnityEventTools.AddPersistentListener(prevBtn.onClick, panel.PrevReview);
+            UnityEventTools.AddPersistentListener(nextBtn.onClick, panel.NextReview);
             UnityEventTools.AddPersistentListener(button.onClick, panel.Continue);
             return panel;
         }
