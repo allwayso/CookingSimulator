@@ -19,5 +19,8 @@ namespace CookingSimulator.Models
 
         /// <summary>是否在锅中（false = 在盘子上或未使用）</summary>
         public bool isInPan;
+
+        /// <summary>是否已激活（曾下锅或已有烹饪进度）</summary>
+        public bool hasActivated;
     }
 }

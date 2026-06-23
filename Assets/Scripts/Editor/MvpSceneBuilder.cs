@@ -255,52 +255,69 @@ namespace CookingSimulator.Editor
                     return;
                 }
 
-                // 已升级检测：如果 TimerText 已存在则跳过
-                if (root.transform.Find("TimerText") != null)
-                {
-                    Debug.Log("CookingPanel prefab already upgraded, skipping.");
-                    return;
-                }
+                Debug.Log("Upgrading CookingPanel prefab (delta)...");
 
-                Debug.Log("Upgrading CookingPanel prefab...");
+                // 每个元素独立检测，只补缺失的
 
                 // 1. 移除旧的"加热"按钮
                 RemoveHeatButton(root.transform);
 
                 // 2. 计时器
-                Assign(cookingUI, "timerText", CreateTimerLabel(root.transform));
+                if (root.transform.Find("TimerText") == null)
+                    Assign(cookingUI, "timerText", CreateTimerLabel(root.transform));
 
                 // 3. 锅按钮化 + 盘子
-                ButtonizePan(root.transform, out var panButton);
-                var plateButton = CreatePlate(root.transform);
-                Assign(cookingUI, "panButton", panButton);
-                Assign(cookingUI, "plateButton", plateButton);
-                UnityEventTools.AddPersistentListener(panButton.onClick, cookingUI.OnPanClicked);
-                UnityEventTools.AddPersistentListener(plateButton.onClick, cookingUI.OnPlateClicked);
+                var potChild = root.transform.Find("pot");
+                if (potChild != null && potChild.GetComponent<Button>() == null)
+                {
+                    ButtonizePan(root.transform, out var panBtn);
+                    Assign(cookingUI, "panButton", panBtn);
+                    UnityEventTools.AddPersistentListener(panBtn.onClick, cookingUI.OnPanClicked);
+                }
+                if (root.transform.Find("Plate") == null)
+                {
+                    var plateBtn = CreatePlate(root.transform);
+                    Assign(cookingUI, "plateButton", plateBtn);
+                    UnityEventTools.AddPersistentListener(plateBtn.onClick, cookingUI.OnPlateClicked);
+                }
 
                 // 4. 食材选择行
-                CreateIngredientSelector(root.transform, out var tomatoBtn, out var eggBtn, out var selText);
-                Assign(cookingUI, "tomatoSelectBtn", tomatoBtn);
-                Assign(cookingUI, "eggSelectBtn", eggBtn);
-                Assign(cookingUI, "selectedIngredientText", selText);
-                UnityEventTools.AddPersistentListener(tomatoBtn.onClick, cookingUI.SelectTomato);
-                UnityEventTools.AddPersistentListener(eggBtn.onClick, cookingUI.SelectEgg);
+                if (root.transform.Find("IngredientSelector") == null)
+                {
+                    CreateIngredientSelector(root.transform, out var tBtn, out var eBtn, out var sTxt);
+                    Assign(cookingUI, "tomatoSelectBtn", tBtn);
+                    Assign(cookingUI, "eggSelectBtn", eBtn);
+                    Assign(cookingUI, "selectedIngredientText", sTxt);
+                    UnityEventTools.AddPersistentListener(tBtn.onClick, cookingUI.SelectTomato);
+                    UnityEventTools.AddPersistentListener(eBtn.onClick, cookingUI.SelectEgg);
+                }
 
                 // 5. 食材熟度行
-                CreateDonenessRow(root.transform, out var tomatoImage, out var eggImage,
-                    out var tomatoText, out var eggText);
-                Assign(cookingUI, "tomatoDonenessImage", tomatoImage);
-                Assign(cookingUI, "eggDonenessImage", eggImage);
-                Assign(cookingUI, "tomatoDonenessText", tomatoText);
-                Assign(cookingUI, "eggDonenessText", eggText);
+                if (root.transform.Find("IngredientDoneness") == null)
+                {
+                    CreateDonenessRow(root.transform, out var tImg, out var eImg, out var tTxt, out var eTxt);
+                    Assign(cookingUI, "tomatoDonenessImage", tImg);
+                    Assign(cookingUI, "eggDonenessImage", eImg);
+                    Assign(cookingUI, "tomatoDonenessText", tTxt);
+                    Assign(cookingUI, "eggDonenessText", eTxt);
+                }
 
-                // 6. 火力滑杆行
-                CreateFireControlRow(root.transform, out var fireSlider, out var fireLevelText);
-                Assign(cookingUI, "fireSlider", fireSlider);
-                Assign(cookingUI, "fireLevelText", fireLevelText);
-                UnityEventTools.AddPersistentListener(fireSlider.onValueChanged, cookingUI.OnFireSliderChanged);
+                // 6. 盘子上的食材图片
+                if (root.transform.Find("TomatoPlateImage") == null)
+                    Assign(cookingUI, "tomatoPlateImage", CreatePlateIngredientImage(root.transform, "TomatoPlateImage"));
+                if (root.transform.Find("EggPlateImage") == null)
+                    Assign(cookingUI, "eggPlateImage", CreatePlateIngredientImage(root.transform, "EggPlateImage"));
 
-                Debug.Log("CookingPanel prefab upgrade complete. All new UI elements saved to prefab.");
+                // 7. 火力滑杆行
+                if (root.transform.Find("FireControl") == null)
+                {
+                    CreateFireControlRow(root.transform, out var fs, out var flt);
+                    Assign(cookingUI, "fireSlider", fs);
+                    Assign(cookingUI, "fireLevelText", flt);
+                    UnityEventTools.AddPersistentListener(fs.onValueChanged, cookingUI.OnFireSliderChanged);
+                }
+
+                Debug.Log("CookingPanel prefab upgrade complete.");
             }
 
             AssetDatabase.SaveAssets();
@@ -360,6 +377,24 @@ namespace CookingSimulator.Editor
 
             btn.interactable = false;
             return btn;
+        }
+
+        /// <summary>
+        /// 创建盘子上的食材图片（初始隐藏）
+        /// </summary>
+        private static Image CreatePlateIngredientImage(Transform parent, string name)
+        {
+            var obj = new GameObject(name, typeof(RectTransform));
+            obj.transform.SetParent(parent, false);
+            var rect = obj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(260, -10);
+            rect.sizeDelta = new Vector2(64, 64);
+            var img = obj.AddComponent<Image>();
+            img.color = Color.white;
+            obj.SetActive(false);
+            return img;
         }
 
         /// <summary>

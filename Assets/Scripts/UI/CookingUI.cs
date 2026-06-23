@@ -26,6 +26,8 @@ namespace CookingSimulator.UI
         [SerializeField] private Text eggDonenessText;
         [SerializeField] private Sprite[] tomatoSprites; // [0]=全生 [1]=半生 [2]=全熟 [3]=过头
         [SerializeField] private Sprite[] eggSprites;
+        [SerializeField] private Image tomatoPlateImage;  // 番茄在盘上的显示
+        [SerializeField] private Image eggPlateImage;     // 鸡蛋在盘上的显示
 
         [Header("Container Interaction")]
         [SerializeField] private Button panButton;
@@ -124,6 +126,16 @@ namespace CookingSimulator.UI
                 else
                     targetImage.color = GetDonenessColor(level);
             }
+
+            // 盘图同步
+            var plateImage = GetIngredientPlateImage(ingredientName);
+            if (plateImage != null)
+            {
+                if (sprites != null && sprites.Length > (int)level && sprites[(int)level] != null)
+                    plateImage.sprite = sprites[(int)level];
+                else
+                    plateImage.color = GetDonenessColor(level);
+            }
         }
 
         public void SetFireSliderInteractable(bool interactable)
@@ -155,7 +167,6 @@ namespace CookingSimulator.UI
         /// <summary>更新容器内容物显示</summary>
         public void UpdateContainerDisplay(bool hasPanContent, bool hasPlateContent)
         {
-            // 锅和盘子按钮根据是否有内容改变视觉（颜色反馈）
             if (panButton != null)
             {
                 var img = panButton.GetComponent<Image>();
@@ -169,6 +180,16 @@ namespace CookingSimulator.UI
                 if (img != null)
                     img.color = hasPlateContent ? new Color(0.95f, 0.92f, 0.85f) : new Color(0.5f, 0.48f, 0.45f);
             }
+        }
+
+        /// <summary>按食材更新图片可见性：未激活→隐藏，锅中→锅图，盘上→盘图</summary>
+        public void UpdateIngredientVisibility(string ingredientName, bool hasActivated, bool isInPan)
+        {
+            var panImg = GetIngredientImage(ingredientName);
+            var plateImg = GetIngredientPlateImage(ingredientName);
+
+            if (panImg != null) panImg.gameObject.SetActive(hasActivated && isInPan);
+            if (plateImg != null) plateImg.gameObject.SetActive(hasActivated && !isInPan);
         }
 
         // ── 食材选择 ──
@@ -270,7 +291,7 @@ namespace CookingSimulator.UI
             if (eggDonenessText != null)
                 eggDonenessText.text = "鸡蛋: 全生";
 
-            // 有精灵图设置初始精灵，否则用颜色
+            // 设置初始精灵
             if (tomatoDonenessImage != null)
             {
                 if (tomatoSprites != null && tomatoSprites.Length > 0 && tomatoSprites[0] != null)
@@ -284,6 +305,27 @@ namespace CookingSimulator.UI
                     eggDonenessImage.sprite = eggSprites[0];
                 else
                     eggDonenessImage.color = GetDonenessColor(DonenessLevel.Raw);
+            }
+
+            // 全部隐藏，等待下锅后才显示
+            HideAllIngredientImages();
+        }
+
+        private void HideAllIngredientImages()
+        {
+            if (tomatoDonenessImage != null) tomatoDonenessImage.gameObject.SetActive(false);
+            if (eggDonenessImage != null) eggDonenessImage.gameObject.SetActive(false);
+            if (tomatoPlateImage != null)
+            {
+                if (tomatoSprites != null && tomatoSprites.Length > 0 && tomatoSprites[0] != null)
+                    tomatoPlateImage.sprite = tomatoSprites[0];
+                tomatoPlateImage.gameObject.SetActive(false);
+            }
+            if (eggPlateImage != null)
+            {
+                if (eggSprites != null && eggSprites.Length > 0 && eggSprites[0] != null)
+                    eggPlateImage.sprite = eggSprites[0];
+                eggPlateImage.gameObject.SetActive(false);
             }
         }
 
@@ -311,6 +353,15 @@ namespace CookingSimulator.UI
                 return tomatoSprites;
             if (ingredientName.Contains("鸡蛋"))
                 return eggSprites;
+            return null;
+        }
+
+        private Image GetIngredientPlateImage(string ingredientName)
+        {
+            if (ingredientName.Contains("番茄"))
+                return tomatoPlateImage;
+            if (ingredientName.Contains("鸡蛋"))
+                return eggPlateImage;
             return null;
         }
 

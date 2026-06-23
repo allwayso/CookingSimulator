@@ -114,6 +114,7 @@ namespace CookingSimulator.Core
                 ingredientStates.TryGetValue(target, out var putState))
             {
                 putState.isInPan = true;
+                putState.hasActivated = true;
                 Debug.Log($"[Cooking] {target} 下锅, isInPan=true");
                 EnsureCoroutineRunning();
             }
@@ -451,8 +452,9 @@ namespace CookingSimulator.Core
                 foreach (var state in ingredientStates.Values)
                 {
                     if (state.isInPan) hasPan = true;
-                    else hasPlate = true;
-
+                    else if (state.hasActivated) hasPlate = true;
+                    cookingUI.UpdateIngredientVisibility(
+                        state.ingredientName, state.hasActivated, state.isInPan);
                 }
             }
             cookingUI.UpdateContainerDisplay(hasPan, hasPlate);
