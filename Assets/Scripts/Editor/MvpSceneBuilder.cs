@@ -17,6 +17,9 @@ namespace CookingSimulator.Editor
         [MenuItem("Cooking Simulator/Build MVP Scene")]
         public static void BuildScene()
         {
+            // 如果 prefab 尚未升级（缺少新 UI 元素），先自动升级
+            UpgradeCookingPanelPrefab();
+
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "MVP";
 
@@ -217,45 +220,194 @@ namespace CookingSimulator.Editor
             const string prefabPath = "Assets/prefab/UI/CookingPanel.prefab";
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             if (prefab == null)
-            {
                 throw new InvalidOperationException($"Missing prefab: {prefabPath}");
-            }
 
             var instance = PrefabUtility.InstantiatePrefab(prefab, parent) as GameObject;
             if (instance == null)
-            {
                 throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
-            }
 
             instance.name = "CookingPanel";
+            return instance.GetComponent<CookingUI>();
+        }
 
-            var cookingUI = instance.GetComponent<CookingUI>();
-            if (cookingUI == null)
+        /// <summary>
+        /// 一次性升级 CookingPanel.prefab：把计时器、火力滑杆、熟度指示器、食材选择器、
+        /// 锅盘按钮等 UI 元素写入 prefab 自身。如果已升级则跳过。
+        /// </summary>
+        [MenuItem("Cooking Simulator/Upgrade CookingPanel Prefab")]
+        public static void UpgradeCookingPanelPrefab()
+        {
+            const string prefabPath = "Assets/prefab/UI/CookingPanel.prefab";
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (existing == null)
             {
-                throw new InvalidOperationException("CookingPanel prefab must have CookingUI component.");
+                Debug.LogError($"Prefab not found: {prefabPath}");
+                return;
             }
 
-            // 移除 prefab 中的旧"加热"按钮（火力现由滑杆控制）
-            RemoveHeatButton(instance.transform);
+            using (var scope = new PrefabUtility.EditPrefabContentsScope(prefabPath))
+            {
+                var root = scope.prefabContentsRoot;
+                var cookingUI = root.GetComponent<CookingUI>();
+                if (cookingUI == null)
+                {
+                    Debug.LogError("CookingPanel prefab must have CookingUI component.");
+                    return;
+                }
 
-            // 计时器（左上角）
-            var timerText = CreateTimerLabel(instance.transform);
-            Assign(cookingUI, "timerText", timerText);
+                // 已升级检测：如果 TimerText 已存在则跳过
+                if (root.transform.Find("TimerText") != null)
+                {
+                    Debug.Log("CookingPanel prefab already upgraded, skipping.");
+                    return;
+                }
 
-            // 在 prefab 基础上添加食材熟度显示和火力滑杆
-            CreateDonenessRow(instance.transform, out var tomatoImage, out var eggImage,
-                out var tomatoText, out var eggText);
-            Assign(cookingUI, "tomatoDonenessImage", tomatoImage);
-            Assign(cookingUI, "eggDonenessImage", eggImage);
-            Assign(cookingUI, "tomatoDonenessText", tomatoText);
-            Assign(cookingUI, "eggDonenessText", eggText);
+                Debug.Log("Upgrading CookingPanel prefab...");
 
-            CreateFireControlRow(instance.transform, out var fireSlider, out var fireLevelText);
-            Assign(cookingUI, "fireSlider", fireSlider);
-            Assign(cookingUI, "fireLevelText", fireLevelText);
-            UnityEventTools.AddPersistentListener(fireSlider.onValueChanged, cookingUI.OnFireSliderChanged);
+                // 1. 移除旧的"加热"按钮
+                RemoveHeatButton(root.transform);
 
-            return cookingUI;
+                // 2. 计时器
+                Assign(cookingUI, "timerText", CreateTimerLabel(root.transform));
+
+                // 3. 锅按钮化 + 盘子
+                ButtonizePan(root.transform, out var panButton);
+                var plateButton = CreatePlate(root.transform);
+                Assign(cookingUI, "panButton", panButton);
+                Assign(cookingUI, "plateButton", plateButton);
+                UnityEventTools.AddPersistentListener(panButton.onClick, cookingUI.OnPanClicked);
+                UnityEventTools.AddPersistentListener(plateButton.onClick, cookingUI.OnPlateClicked);
+
+                // 4. 食材选择行
+                CreateIngredientSelector(root.transform, out var tomatoBtn, out var eggBtn, out var selText);
+                Assign(cookingUI, "tomatoSelectBtn", tomatoBtn);
+                Assign(cookingUI, "eggSelectBtn", eggBtn);
+                Assign(cookingUI, "selectedIngredientText", selText);
+                UnityEventTools.AddPersistentListener(tomatoBtn.onClick, cookingUI.SelectTomato);
+                UnityEventTools.AddPersistentListener(eggBtn.onClick, cookingUI.SelectEgg);
+
+                // 5. 食材熟度行
+                CreateDonenessRow(root.transform, out var tomatoImage, out var eggImage,
+                    out var tomatoText, out var eggText);
+                Assign(cookingUI, "tomatoDonenessImage", tomatoImage);
+                Assign(cookingUI, "eggDonenessImage", eggImage);
+                Assign(cookingUI, "tomatoDonenessText", tomatoText);
+                Assign(cookingUI, "eggDonenessText", eggText);
+
+                // 6. 火力滑杆行
+                CreateFireControlRow(root.transform, out var fireSlider, out var fireLevelText);
+                Assign(cookingUI, "fireSlider", fireSlider);
+                Assign(cookingUI, "fireLevelText", fireLevelText);
+                UnityEventTools.AddPersistentListener(fireSlider.onValueChanged, cookingUI.OnFireSliderChanged);
+
+                Debug.Log("CookingPanel prefab upgrade complete. All new UI elements saved to prefab.");
+            }
+
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// 给 prefab 中的 "pot" Image 添加 Button 组件使其可点击
+        /// </summary>
+        private static void ButtonizePan(Transform root, out Button panButton)
+        {
+            panButton = null;
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == "pot")
+                {
+                    panButton = child.gameObject.AddComponent<Button>();
+                    return;
+                }
+            }
+
+            // fallback: 如果找不到 pot，创建一个
+            var fallback = new GameObject("pot", typeof(RectTransform), typeof(Image), typeof(Button));
+            fallback.transform.SetParent(root, false);
+            var rect = fallback.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(120, 120);
+            fallback.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.09f);
+            panButton = fallback.GetComponent<Button>();
+        }
+
+        /// <summary>
+        /// 创建盘子：一个可点击的 Image+Button
+        /// </summary>
+        private static Button CreatePlate(Transform parent)
+        {
+            var plate = new GameObject("Plate", typeof(RectTransform), typeof(Image), typeof(Button));
+            plate.transform.SetParent(parent, false);
+            var rect = plate.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(260, -30);
+            rect.sizeDelta = new Vector2(100, 24);
+            var img = plate.GetComponent<Image>();
+            img.color = new Color(0.5f, 0.48f, 0.45f);
+            var btn = plate.GetComponent<Button>();
+
+            // 盘子标签
+            var label = CreateText(plate.transform, "盘子");
+            label.fontSize = 16;
+            label.color = new Color(0.9f, 0.88f, 0.8f);
+            var labelRect = label.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            btn.interactable = false;
+            return btn;
+        }
+
+        /// <summary>
+        /// 创建食材选择行：番茄/鸡蛋按钮 + 选中文本
+        /// </summary>
+        private static void CreateIngredientSelector(Transform parent,
+            out Button tomatoBtn, out Button eggBtn, out Text selText)
+        {
+            var row = new GameObject("IngredientSelector", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            SetPreferredSize(row, 760, 44);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 12;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            var label = CreateText(row.transform, "选择食材:");
+            label.fontSize = 18;
+            label.GetComponent<RectTransform>().sizeDelta = new Vector2(120, 32);
+
+            // 番茄按钮
+            var tomatoObj = new GameObject("TomatoSelectBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+            tomatoObj.transform.SetParent(row.transform, false);
+            SetPreferredSize(tomatoObj, 96, 36);
+            tomatoObj.GetComponent<Image>().color = new Color(0.35f, 0.25f, 0.15f);
+            tomatoBtn = tomatoObj.GetComponent<Button>();
+            var tomatoLabel = CreateText(tomatoObj.transform, "番茄");
+            tomatoLabel.fontSize = 20;
+            StretchChild(tomatoLabel.gameObject, 0, 0, 0, 0);
+
+            // 鸡蛋按钮
+            var eggObj = new GameObject("EggSelectBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+            eggObj.transform.SetParent(row.transform, false);
+            SetPreferredSize(eggObj, 96, 36);
+            eggObj.GetComponent<Image>().color = new Color(0.35f, 0.25f, 0.15f);
+            eggBtn = eggObj.GetComponent<Button>();
+            var eggLabel = CreateText(eggObj.transform, "鸡蛋");
+            eggLabel.fontSize = 20;
+            StretchChild(eggLabel.gameObject, 0, 0, 0, 0);
+
+            // 选中文本
+            selText = CreateText(row.transform, "下锅: 鸡蛋");
+            selText.fontSize = 20;
+            selText.color = new Color(0.95f, 0.88f, 0.56f);
+            selText.GetComponent<RectTransform>().sizeDelta = new Vector2(160, 32);
         }
 
         /// <summary>

@@ -16,5 +16,8 @@ namespace CookingSimulator.Models
 
         /// <summary>当前熟度</summary>
         public DonenessLevel doneness;
+
+        /// <summary>是否在锅中（false = 在盘子上或未使用）</summary>
+        public bool isInPan;
     }
 }

@@ -70,9 +70,9 @@ namespace CookingSimulator.Core
             currentRecipe = recipe;
             currentDishId = Guid.NewGuid().ToString("N");
             currentState = DishState.Raw;
-            currentFireLevel = 0;
+            currentFireLevel = 1; // 默认小火
 
-            // 初始化食材熟度追踪
+            // 初始化食材熟度追踪（所有食材初始在盘子上/未使用）
             ingredientStates = new Dictionary<string, IngredientCookState>();
             currentCookConfigs = recipe.ingredientCookingConfigs ?? Array.Empty<IngredientCookingConfig>();
 
@@ -83,16 +83,20 @@ namespace CookingSimulator.Core
                 {
                     ingredientName = config.ingredientName,
                     cookProgress = 0f,
-                    doneness = DonenessLevel.Raw
+                    doneness = DonenessLevel.Raw,
+                    isInPan = false
                 };
                 Debug.Log($"[Cooking] 食材: {config.ingredientName}, 全熟阈值: {config.fullCookThreshold}");
             }
 
             logManager.StartLog(currentUser, currentRecipe, currentDishId);
             cookingUI.Show(currentRecipe, currentState,
-                HandleCookingAction, FinishCooking, HandleFireLevelChanged);
+                HandleCookingAction, FinishCooking, HandleFireLevelChanged,
+                HandleTransferToPlate, HandleTransferToPan);
             Hide(recipeSelectUI);
         }
+
+        // ── 动作处理 ──
 
         public void HandleCookingAction(string action, string target)
         {
@@ -105,28 +109,93 @@ namespace CookingSimulator.Core
 
             currentState = after;
 
-            // 进入 Cooking 状态时启动协程（必须在 currentState 更新之后）
-            if (after == DishState.Cooking)
+            // 放入食材：标记该食材在锅中，启动协程
+            if (action == "put_in_pan" && ingredientStates != null &&
+                ingredientStates.TryGetValue(target, out var putState))
             {
-                cookingCoroutine = StartCoroutine(CookingCoroutine());
+                putState.isInPan = true;
+                Debug.Log($"[Cooking] {target} 下锅, isInPan=true");
+                EnsureCoroutineRunning();
+            }
+
+            // 进入 Cooking 状态时启动协程
+            if (after == DishState.Cooking && before != DishState.Cooking)
+            {
+                EnsureCoroutineRunning();
             }
             // 离开 Cooking 状态时停止协程
-            else if (before == DishState.Cooking && after != DishState.Cooking)
+            if (before == DishState.Cooking && after != DishState.Cooking)
             {
-                if (cookingCoroutine != null)
-                {
-                    StopCoroutine(cookingCoroutine);
-                    cookingCoroutine = null;
-                }
+                StopCookingCoroutine();
             }
 
             logManager.AddAction(action, target, before, after);
             cookingUI.UpdateState(currentState);
+            RefreshContainerDisplay();
         }
 
         public void HandleFireLevelChanged(int level)
         {
             currentFireLevel = level;
+        }
+
+        public void HandleTransferToPlate()
+        {
+            if (currentState != DishState.Cooking)
+            {
+                cookingUI.ShowMessage("现在不能盛出");
+                return;
+            }
+
+            bool hasContent = false;
+            foreach (var state in ingredientStates.Values)
+            {
+                if (state.isInPan)
+                {
+                    state.isInPan = false;
+                    hasContent = true;
+                }
+            }
+
+            if (!hasContent)
+            {
+                cookingUI.ShowMessage("锅里没有东西可以盛出");
+                return;
+            }
+
+            Debug.Log("[Cooking] 锅→盘 转移");
+            logManager.AddAction("transfer_to_plate", "锅→盘", currentState, currentState);
+            RefreshContainerDisplay();
+        }
+
+        public void HandleTransferToPan()
+        {
+            if (currentState != DishState.Cooking)
+            {
+                cookingUI.ShowMessage("现在不能倒回");
+                return;
+            }
+
+            bool hasContent = false;
+            foreach (var state in ingredientStates.Values)
+            {
+                if (!state.isInPan)
+                {
+                    state.isInPan = true;
+                    hasContent = true;
+                }
+            }
+
+            if (!hasContent)
+            {
+                cookingUI.ShowMessage("盘子上没有东西可以倒回");
+                return;
+            }
+
+            Debug.Log("[Cooking] 盘→锅 转移");
+            EnsureCoroutineRunning();
+            logManager.AddAction("transfer_to_pan", "盘→锅", currentState, currentState);
+            RefreshContainerDisplay();
         }
 
         public void FinishCooking()
@@ -144,7 +213,8 @@ namespace CookingSimulator.Core
                     {
                         ingredientName = kvp.Value.ingredientName,
                         cookProgress = kvp.Value.cookProgress,
-                        doneness = kvp.Value.doneness
+                        doneness = kvp.Value.doneness,
+                        isInPan = kvp.Value.isInPan
                     });
                 }
             }
@@ -254,6 +324,8 @@ namespace CookingSimulator.Core
             SetLoginBackgroundVisible(true);
         }
 
+        // ── 状态机 ──
+
         private bool TryApplyAction(string action, out DishState nextState)
         {
             nextState = currentState;
@@ -264,14 +336,13 @@ namespace CookingSimulator.Core
                 return true;
             }
 
-            if (action == "put_in_pan" && currentState == DishState.Cut)
+            // 下锅：Cut→Cooking（首次）或 Cooking 下再次下锅（不同食材）
+            if (action == "put_in_pan" && (currentState == DishState.Cut || currentState == DishState.Cooking))
             {
-                nextState = DishState.Cooking;
+                if (currentState == DishState.Cut)
+                    nextState = DishState.Cooking;
                 return true;
             }
-
-            // "heat" 动作已移除 —— 火力由滑杆实时控制，不再通过按钮触发
-            // 保留状态检查以兼容旧日志/步骤，但不做任何操作
 
             if (action == "season" && currentState == DishState.Cooking)
             {
@@ -293,13 +364,29 @@ namespace CookingSimulator.Core
             return false;
         }
 
-        /// <summary>
-        /// 烹饪协程：每帧根据火力累积食材烹饪进度，检测熟度变化并更新 UI
-        /// </summary>
+        // ── 烹饪协程 ──
+
+        private void EnsureCoroutineRunning()
+        {
+            if (cookingCoroutine == null && currentState == DishState.Cooking)
+            {
+                cookingCoroutine = StartCoroutine(CookingCoroutine());
+            }
+        }
+
+        private void StopCookingCoroutine()
+        {
+            if (cookingCoroutine != null)
+            {
+                StopCoroutine(cookingCoroutine);
+                cookingCoroutine = null;
+            }
+        }
+
         private IEnumerator CookingCoroutine()
         {
             cookingElapsed = 0f;
-            Debug.Log($"[Cooking] 协程启动, 火力={currentFireLevel}, 食材数={ingredientStates?.Count ?? 0}, 配置数={currentCookConfigs?.Length ?? 0}");
+            Debug.Log($"[Cooking] 协程启动, 火力={currentFireLevel}, 食材数={ingredientStates?.Count ?? 0}");
 
             while (currentState == DishState.Cooking)
             {
@@ -313,10 +400,11 @@ namespace CookingSimulator.Core
                     foreach (var config in currentCookConfigs)
                     {
                         if (!ingredientStates.TryGetValue(config.ingredientName, out var state))
-                        {
-                            Debug.LogWarning($"[Cooking] 找不到食材状态: {config.ingredientName}");
                             continue;
-                        }
+
+                        // 只烹饪锅里的食材
+                        if (!state.isInPan)
+                            continue;
 
                         state.cookProgress += delta;
                         var newDoneness = CalculateDoneness(state.cookProgress, config.fullCookThreshold);
@@ -333,13 +421,10 @@ namespace CookingSimulator.Core
                 yield return null;
             }
 
+            cookingCoroutine = null;
             Debug.Log($"[Cooking] 协程结束, 总烹饪时间={cookingElapsed:F1}s");
         }
 
-        /// <summary>
-        /// 根据烹饪进度和全熟阈值计算当前熟度等级
-        /// 阈值划分：0-25% 全生 / 25%-62.5% 半生 / 62.5%-100% 全熟 / >100% 过头
-        /// </summary>
         private static DonenessLevel CalculateDoneness(float progress, float fullThreshold)
         {
             if (fullThreshold <= 0f)
@@ -355,6 +440,25 @@ namespace CookingSimulator.Core
                 return DonenessLevel.FullyCooked;
             return DonenessLevel.Overcooked;
         }
+
+        // ── 容器显示 ──
+
+        private void RefreshContainerDisplay()
+        {
+            bool hasPan = false, hasPlate = false;
+            if (ingredientStates != null)
+            {
+                foreach (var state in ingredientStates.Values)
+                {
+                    if (state.isInPan) hasPan = true;
+                    else hasPlate = true;
+
+                }
+            }
+            cookingUI.UpdateContainerDisplay(hasPan, hasPlate);
+        }
+
+        // ── 辅助 ──
 
         private RecipeData LoadRecipeForDish(DishData dish)
         {
@@ -396,9 +500,7 @@ namespace CookingSimulator.Core
         private static void Hide(MonoBehaviour view)
         {
             if (view == null)
-            {
                 return;
-            }
 
             view.gameObject.SetActive(false);
         }

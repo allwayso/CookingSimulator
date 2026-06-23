@@ -8,7 +8,6 @@ namespace CookingSimulator.UI
     public class CookingUI : MonoBehaviour
     {
         [SerializeField] private Text recipeText;
-        [SerializeField] private Text stateText;
         [SerializeField] private Text hintText;
         [SerializeField] private Text messageText;
         [SerializeField] private Image dishStateImage;
@@ -25,41 +24,65 @@ namespace CookingSimulator.UI
         [SerializeField] private Image eggDonenessImage;
         [SerializeField] private Text tomatoDonenessText;
         [SerializeField] private Text eggDonenessText;
+        [SerializeField] private Sprite[] tomatoSprites; // [0]=全生 [1]=半生 [2]=全熟 [3]=过头
+        [SerializeField] private Sprite[] eggSprites;
+
+        [Header("Container Interaction")]
+        [SerializeField] private Button panButton;
+        [SerializeField] private Button plateButton;
+
+        [Header("Ingredient Selector")]
+        [SerializeField] private Button tomatoSelectBtn;
+        [SerializeField] private Button eggSelectBtn;
+        [SerializeField] private Text selectedIngredientText;
 
         private Action<string, string> onAction;
         private Action onFinish;
+        private Action onTransferToPlate;
+        private Action onTransferToPan;
         private Action<int> onFireLevelChanged;
+
+        private string selectedIngredient = "鸡蛋";
 
         private static readonly string[] FireLevelNames = { "关火", "小火", "中火", "大火", "猛火" };
 
         public void Show(RecipeData recipe, DishState state,
             Action<string, string> actionHandler, Action finishHandler,
-            Action<int> fireLevelHandler)
+            Action<int> fireLevelHandler,
+            Action transferToPlateHandler, Action transferToPanHandler)
         {
             onAction = actionHandler;
             onFinish = finishHandler;
             onFireLevelChanged = fireLevelHandler;
+            onTransferToPlate = transferToPlateHandler;
+            onTransferToPan = transferToPanHandler;
             gameObject.SetActive(true);
             recipeText.text = recipe.name;
             messageText.text = string.Empty;
 
-            // 初始化火力滑杆
+            // 默认选中鸡蛋
+            selectedIngredient = "鸡蛋";
+            UpdateIngredientSelection();
+
+            // 初始化火力滑杆（默认小火）
             if (fireSlider != null)
             {
-                fireSlider.value = 0;
+                fireSlider.value = 1;
                 fireSlider.interactable = false;
-                UpdateFireLevelText(0);
+                UpdateFireLevelText(1);
             }
 
             // 初始化熟度显示
             ResetDonenessDisplay();
+
+            // 初始化容器交互
+            SetContainerButtonsInteractable(false);
 
             UpdateState(state);
         }
 
         public void UpdateState(DishState state)
         {
-            stateText.text = $"当前状态：{state}";
             hintText.text = GetHint(state);
 
             if (dishStateImage != null)
@@ -67,8 +90,9 @@ namespace CookingSimulator.UI
                 dishStateImage.color = GetStateColor(state);
             }
 
-            // 仅在 Cooking 状态下可调节火力
-            SetFireSliderInteractable(state == DishState.Cooking);
+            bool isCooking = state == DishState.Cooking;
+            SetFireSliderInteractable(isCooking);
+            SetContainerButtonsInteractable(isCooking);
         }
 
         public void ShowMessage(string message)
@@ -87,17 +111,18 @@ namespace CookingSimulator.UI
         {
             var targetImage = GetIngredientImage(ingredientName);
             var targetText = GetIngredientText(ingredientName);
+            var sprites = GetIngredientSprites(ingredientName);
 
-            // 更新熟度文字
             if (targetText != null)
-            {
                 targetText.text = $"{ingredientName}: {GetDonenessName(level)}";
-            }
 
-            // 更新熟度贴图颜色（临时方案，后续替换为贴图切换）
             if (targetImage != null)
             {
-                targetImage.color = GetDonenessColor(level);
+                // 有精灵图就用精灵图，否则 fallback 到颜色
+                if (sprites != null && sprites.Length > (int)level && sprites[(int)level] != null)
+                    targetImage.sprite = sprites[(int)level];
+                else
+                    targetImage.color = GetDonenessColor(level);
             }
         }
 
@@ -107,6 +132,14 @@ namespace CookingSimulator.UI
             {
                 fireSlider.interactable = interactable;
             }
+        }
+
+        public void SetContainerButtonsInteractable(bool interactable)
+        {
+            if (panButton != null)
+                panButton.interactable = interactable;
+            if (plateButton != null)
+                plateButton.interactable = interactable;
         }
 
         public void UpdateTimer(float elapsedSeconds)
@@ -119,6 +152,82 @@ namespace CookingSimulator.UI
             }
         }
 
+        /// <summary>更新容器内容物显示</summary>
+        public void UpdateContainerDisplay(bool hasPanContent, bool hasPlateContent)
+        {
+            // 锅和盘子按钮根据是否有内容改变视觉（颜色反馈）
+            if (panButton != null)
+            {
+                var img = panButton.GetComponent<Image>();
+                if (img != null)
+                    img.color = hasPanContent ? new Color(0.6f, 0.35f, 0.18f) : new Color(0.25f, 0.2f, 0.15f);
+            }
+
+            if (plateButton != null)
+            {
+                var img = plateButton.GetComponent<Image>();
+                if (img != null)
+                    img.color = hasPlateContent ? new Color(0.95f, 0.92f, 0.85f) : new Color(0.5f, 0.48f, 0.45f);
+            }
+        }
+
+        // ── 食材选择 ──
+
+        public void SelectIngredient(string ingredientName)
+        {
+            selectedIngredient = ingredientName;
+            UpdateIngredientSelection();
+        }
+
+        public void SelectTomato()
+        {
+            SelectIngredient("番茄");
+        }
+
+        public void SelectEgg()
+        {
+            SelectIngredient("鸡蛋");
+        }
+
+        private void UpdateIngredientSelection()
+        {
+            if (selectedIngredientText != null)
+                selectedIngredientText.text = $"下锅: {selectedIngredient}";
+
+            // 高亮选中按钮
+            if (tomatoSelectBtn != null)
+            {
+                var img = tomatoSelectBtn.GetComponent<Image>();
+                if (img != null)
+                    img.color = selectedIngredient.Contains("番茄")
+                        ? new Color(0.95f, 0.65f, 0.2f)
+                        : new Color(0.35f, 0.25f, 0.15f);
+            }
+
+            if (eggSelectBtn != null)
+            {
+                var img = eggSelectBtn.GetComponent<Image>();
+                if (img != null)
+                    img.color = selectedIngredient.Contains("鸡蛋")
+                        ? new Color(0.95f, 0.65f, 0.2f)
+                        : new Color(0.35f, 0.25f, 0.15f);
+            }
+        }
+
+        // ── 容器交互 ──
+
+        public void OnPanClicked()
+        {
+            onTransferToPlate?.Invoke();
+        }
+
+        public void OnPlateClicked()
+        {
+            onTransferToPan?.Invoke();
+        }
+
+        // ── 动作按钮 ──
+
         public void Cut()
         {
             onAction?.Invoke("cut", "番茄");
@@ -126,7 +235,7 @@ namespace CookingSimulator.UI
 
         public void PutInPan()
         {
-            onAction?.Invoke("put_in_pan", "食材");
+            onAction?.Invoke("put_in_pan", selectedIngredient);
         }
 
         public void Season()
@@ -144,6 +253,8 @@ namespace CookingSimulator.UI
             onFinish?.Invoke();
         }
 
+        // ── 辅助方法 ──
+
         private void UpdateFireLevelText(int level)
         {
             if (fireLevelText != null)
@@ -158,10 +269,22 @@ namespace CookingSimulator.UI
                 tomatoDonenessText.text = "番茄: 全生";
             if (eggDonenessText != null)
                 eggDonenessText.text = "鸡蛋: 全生";
+
+            // 有精灵图设置初始精灵，否则用颜色
             if (tomatoDonenessImage != null)
-                tomatoDonenessImage.color = GetDonenessColor(DonenessLevel.Raw);
+            {
+                if (tomatoSprites != null && tomatoSprites.Length > 0 && tomatoSprites[0] != null)
+                    tomatoDonenessImage.sprite = tomatoSprites[0];
+                else
+                    tomatoDonenessImage.color = GetDonenessColor(DonenessLevel.Raw);
+            }
             if (eggDonenessImage != null)
-                eggDonenessImage.color = GetDonenessColor(DonenessLevel.Raw);
+            {
+                if (eggSprites != null && eggSprites.Length > 0 && eggSprites[0] != null)
+                    eggDonenessImage.sprite = eggSprites[0];
+                else
+                    eggDonenessImage.color = GetDonenessColor(DonenessLevel.Raw);
+            }
         }
 
         private Image GetIngredientImage(string ingredientName)
@@ -179,6 +302,15 @@ namespace CookingSimulator.UI
                 return tomatoDonenessText;
             if (ingredientName.Contains("鸡蛋"))
                 return eggDonenessText;
+            return null;
+        }
+
+        private Sprite[] GetIngredientSprites(string ingredientName)
+        {
+            if (ingredientName.Contains("番茄"))
+                return tomatoSprites;
+            if (ingredientName.Contains("鸡蛋"))
+                return eggSprites;
             return null;
         }
 
@@ -204,13 +336,13 @@ namespace CookingSimulator.UI
             switch (level)
             {
                 case DonenessLevel.Raw:
-                    return new Color(0.82f, 0.25f, 0.2f);       // 红色 — 生
+                    return new Color(0.82f, 0.25f, 0.2f);
                 case DonenessLevel.HalfCooked:
-                    return new Color(0.95f, 0.65f, 0.2f);      // 黄色 — 半生
+                    return new Color(0.95f, 0.65f, 0.2f);
                 case DonenessLevel.FullyCooked:
-                    return new Color(0.28f, 0.68f, 0.34f);     // 绿色 — 全熟
+                    return new Color(0.28f, 0.68f, 0.34f);
                 case DonenessLevel.Overcooked:
-                    return new Color(0.3f, 0.15f, 0.1f);       // 深褐 — 过头
+                    return new Color(0.3f, 0.15f, 0.1f);
                 default:
                     return Color.white;
             }
@@ -223,9 +355,9 @@ namespace CookingSimulator.UI
                 case DishState.Raw:
                     return "当前步骤：先切菜。";
                 case DishState.Cut:
-                    return "当前步骤：把食材下锅。";
+                    return "当前步骤：选择食材后点击下锅。";
                 case DishState.Cooking:
-                    return "当前步骤：调节火力控制熟度，番茄和鸡蛋熟得不一样快哦。";
+                    return "调节火力控制熟度。点击锅盛出到盘子，点击盘子倒回锅中。";
                 case DishState.Seasoned:
                     return "当前步骤：翻炒均匀后出锅。";
                 case DishState.Done:
