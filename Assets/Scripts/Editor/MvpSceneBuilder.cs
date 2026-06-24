@@ -23,6 +23,10 @@ namespace CookingSimulator.Editor
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "MVP";
 
+            EnsureFridgePrefabExists();
+            EnsureCharacterPrefabExists();
+            EnsureStovePrefabExists();
+
             var loginBackground = CreateLoginBackground();
             var character = CreateCharacter();
             var fridge = CreateFridge(character != null ? character.transform : null);
@@ -86,6 +90,7 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "interactionManager", interactionManager);
             Assign(gameManager, "ingredientSelectUI", ingredientSelect);
             Assign(gameManager, "playerObject", character);
+            Assign(gameManager, "fridgeObject", fridge);
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
@@ -151,7 +156,28 @@ namespace CookingSimulator.Editor
             return background;
         }
 
+        private static void EnsureCharacterPrefabExists()
+        {
+            const string path = "Assets/prefab/kitchen/Character.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+                return;
+
+            var character = BuildCharacterAsset();
+            PrefabUtility.SaveAsPrefabAsset(character, path);
+            UnityEngine.Object.DestroyImmediate(character);
+            AssetDatabase.SaveAssets();
+        }
+
         private static GameObject CreateCharacter()
+        {
+            const string path = "Assets/prefab/kitchen/Character.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            var character = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            character.name = "小人"; // 保持原名，冰箱动画运行时查找依赖此名称
+            return character;
+        }
+
+        private static GameObject BuildCharacterAsset()
         {
             const string spriteSheetPath = "Assets/character/sprite sheet init.png";
             var subSprites = AssetDatabase.LoadAllAssetsAtPath(spriteSheetPath);
@@ -176,6 +202,7 @@ namespace CookingSimulator.Editor
 
             var sr = character.AddComponent<SpriteRenderer>();
             sr.sprite = idleSprite;
+            sr.sortingOrder = 5; // 确保角色渲染在 tilemap 层之上
 
             var move = character.AddComponent<人物移动>();
             var moveSO = new SerializedObject(move);
@@ -195,7 +222,39 @@ namespace CookingSimulator.Editor
             return character;
         }
 
+        private static void EnsureFridgePrefabExists()
+        {
+            const string path = "Assets/prefab/kitchen/Fridge.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+                return;
+
+            var fridge = BuildFridgeAsset();
+            Directory.CreateDirectory("Assets/prefab/kitchen");
+            PrefabUtility.SaveAsPrefabAsset(fridge, path);
+            UnityEngine.Object.DestroyImmediate(fridge);
+            AssetDatabase.SaveAssets();
+        }
+
         private static GameObject CreateFridge(Transform playerTransform)
+        {
+            const string path = "Assets/prefab/kitchen/Fridge.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            var fridge = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            fridge.name = "Fridge 1 _0"; // 保持原名，人物移动碰撞检测依赖此名称
+
+            // 注入运行时引用（prefab 无法预置 player 引用）
+            var anim = fridge.GetComponent<冰箱动画>();
+            if (anim != null && playerTransform != null)
+            {
+                var animSO = new SerializedObject(anim);
+                animSO.FindProperty("player").objectReferenceValue = playerTransform;
+                animSO.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            return fridge;
+        }
+
+        private static GameObject BuildFridgeAsset()
         {
             var fridge = new GameObject("Fridge 1 _0");
             fridge.transform.position = new Vector3(-0.08f, -0.36f, 0f);
@@ -209,10 +268,10 @@ namespace CookingSimulator.Editor
 
             var sr = fridge.AddComponent<SpriteRenderer>();
             sr.sprite = frame0;
+            sr.sortingOrder = 5; // 确保渲染在 tilemap 层之上（floor=0, border=1, otherStuff=2）
 
             var anim = fridge.AddComponent<冰箱动画>();
             var animSO = new SerializedObject(anim);
-            animSO.FindProperty("player").objectReferenceValue = playerTransform;
             animSO.FindProperty("triggerDistance").floatValue = 4f;
             animSO.FindProperty("frameDuration").floatValue = 0.12f;
 
@@ -237,7 +296,26 @@ namespace CookingSimulator.Editor
             return fridge;
         }
 
+        private static void EnsureStovePrefabExists()
+        {
+            const string path = "Assets/prefab/kitchen/Stove.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+                return;
+
+            var stove = BuildStoveAsset();
+            PrefabUtility.SaveAsPrefabAsset(stove, path);
+            UnityEngine.Object.DestroyImmediate(stove);
+            AssetDatabase.SaveAssets();
+        }
+
         private static GameObject CreateStove(Transform playerTransform)
+        {
+            const string path = "Assets/prefab/kitchen/Stove.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            return PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+        }
+
+        private static GameObject BuildStoveAsset()
         {
             var stove = new GameObject("灶台");
             stove.transform.position = new Vector3(7f, 2.76f, 0f);
@@ -248,6 +326,7 @@ namespace CookingSimulator.Editor
 
             var sr = stove.AddComponent<SpriteRenderer>();
             sr.sprite = stoveSprite;
+            sr.sortingOrder = 5; // 确保渲染在 tilemap 层之上
 
             // 灶台动画（静态精灵）
             var anim = stove.AddComponent<灶台动画>();

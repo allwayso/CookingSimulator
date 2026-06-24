@@ -32,6 +32,7 @@ namespace CookingSimulator.Core
         [SerializeField] private 交互管理 interactionManager;
         [SerializeField] private 备菜选菜UI ingredientSelectUI;
         [SerializeField] private GameObject playerObject;
+        [SerializeField] private GameObject fridgeObject;
 
         private UserData currentUser;
         private RecipeData currentRecipe;
@@ -92,6 +93,10 @@ namespace CookingSimulator.Core
                 interactionManager.OnInteract -= HandleInteraction;
                 interactionManager.OnInteract += HandleInteraction;
             }
+
+            // 恢复厨房物体显示
+            if (fridgeObject != null) fridgeObject.SetActive(true);
+            if (playerObject != null) playerObject.SetActive(true);
         }
 
         private void HandleInteraction(InteractionType type)
@@ -166,6 +171,10 @@ namespace CookingSimulator.Core
                 HandleTransferToPlate, HandleTransferToPan);
             SetLoginBackgroundVisible(false);
             Hide(recipeSelectUI);
+
+            // 做菜时隐藏厨房物体
+            if (fridgeObject != null) fridgeObject.SetActive(false);
+            if (playerObject != null) playerObject.SetActive(false);
         }
 
         // ── 动作处理 ──
