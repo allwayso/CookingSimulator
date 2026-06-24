@@ -8,7 +8,11 @@ namespace CookingSimulator.UI
 {
     public class ReviewUI : MonoBehaviour
     {
-        [SerializeField] private Text reviewText;
+        [SerializeField] private Text npcNameText;
+        [SerializeField] private Text scoreText;
+        [SerializeField] private Text summaryText;
+        [SerializeField] private Text suggestionText;
+        [SerializeField] private Text reputationText;
         [SerializeField] private Text continueButtonText;
         [SerializeField] private Button prevButton;
         [SerializeField] private Button nextButton;
@@ -62,14 +66,20 @@ namespace CookingSimulator.UI
 
         private void DisplayCurrent()
         {
-            if (reviews.Count == 0 || reviewText == null) return;
+            if (reviews.Count == 0) return;
 
             var review = reviews[currentIndex];
-            reviewText.text =
-                $"评分：{review.score}\n\n" +
-                $"评价：\n{review.summary}\n\n" +
-                $"建议：\n{review.suggestion}\n\n" +
-                $"声望变化：{review.reputationDelta}";
+
+            if (npcNameText != null)
+                npcNameText.text = review.reviewerName ?? "评价者";
+            if (scoreText != null)
+                scoreText.text = $"评分：{review.score}";
+            if (summaryText != null)
+                summaryText.text = review.summary;
+            if (suggestionText != null)
+                suggestionText.text = $"建议：{review.suggestion}";
+            if (reputationText != null)
+                reputationText.text = $"声望 {review.reputationDelta:+0;-#}";
 
             if (pageIndicator != null)
                 pageIndicator.text = $"{currentIndex + 1}/{reviews.Count}";

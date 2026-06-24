@@ -247,59 +247,81 @@ namespace CookingSimulator.Core
             saveManager.SaveDish(dish);
             Hide(saveDishUI);
 
-            // 加载 NPC 列表，并行请求 AI 评价
+            // 后台异步请求 AI 评价
             var npcs = AIReviewService.LoadNPCs();
-            if (npcs.Count == 0)
+            if (npcs.Count > 0)
             {
-                // 没有 NPC 配置，直接展示本地评价
-                currentUser.reputation += currentReview.reputationDelta;
-                saveManager.SaveUser(currentUser);
-                statusBarUI?.Refresh(currentUser);
-                reviewUI.Show(currentReview, ShowMenu);
-                return;
+                StartCoroutine(BackgroundAIReview(dish, npcs));
             }
 
-            StartCoroutine(BatchAIReview(dish, npcs));
+            // 立即回到菜单
+            ShowMenu();
         }
 
-        private IEnumerator BatchAIReview(DishData dish, List<NPCData> npcs)
+        private IEnumerator BackgroundAIReview(DishData dish, List<NPCData> npcs)
         {
             var recipe = currentRecipe;
             var log = LoadLog(dish.logPath);
+            var baseReview = currentReview;
 
-            yield return aiReviewService.CreateBatchReviews(dish, recipe, log, currentReview, npcs, reviews =>
+            yield return aiReviewService.CreateBatchReviews(dish, recipe, log, baseReview, npcs, reviews =>
             {
-                // 保存所有 AI 评价
+                var ids = new List<string>();
                 foreach (var review in reviews)
                 {
                     saveManager.SaveReview(review);
+                    ids.Add(review.reviewId);
                 }
 
-                // 取平均分更新菜品
                 var avgScore = 0;
                 foreach (var r in reviews) avgScore += r.score;
                 avgScore /= reviews.Count;
 
                 dish.score = avgScore;
+                dish.reviewIds = ids;
                 dish.reviewId = reviews[0].reviewId;
                 dish.reviewText = reviews[0].summary;
                 saveManager.SaveDish(dish);
 
-                // 综合声望变化
                 var totalDelta = 0;
                 foreach (var r in reviews) totalDelta += r.reputationDelta;
                 currentUser.reputation += totalDelta;
                 saveManager.SaveUser(currentUser);
                 statusBarUI?.Refresh(currentUser);
 
-                reviewUI.ShowMultiple(reviews, ShowMenu);
+                Debug.Log($"[AI] 后台评价完成，{reviews.Count} 条已保存");
             });
+        }
+
+        public void ShowDishReviews(DishData dish)
+        {
+            // 加载该菜品所有保存的评价
+            var reviews = new List<ReviewData>();
+
+            if (dish.reviewIds != null)
+            {
+                foreach (var id in dish.reviewIds)
+                {
+                    var review = saveManager.LoadReview(id);
+                    if (review != null) reviews.Add(review);
+                }
+            }
+
+            if (reviews.Count == 0)
+            {
+                // 还没评价或只有本地评价，用菜品的本地评价兜底
+                var localReview = saveManager.LoadReview(dish.reviewId);
+                if (localReview != null) reviews.Add(localReview);
+            }
+
+            reviewUI.ShowMultiple(reviews, ShowMenu);
+            Hide(menuUI);
         }
 
         public void ShowMenu()
         {
             var dishes = saveManager.LoadDishes(currentUser.userId);
-            menuUI.ShowDishes(dishes, EnterChefMode);
+            menuUI.ShowDishes(dishes, EnterChefMode, ShowDishReviews);
             Hide(saveDishUI);
             Hide(reviewUI);
         }

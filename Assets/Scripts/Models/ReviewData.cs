@@ -7,6 +7,7 @@ namespace CookingSimulator.Models
     {
         public string reviewId;
         public string dishId;
+        public string reviewerName;
         public int score;
         public string summary;
         public string suggestion;

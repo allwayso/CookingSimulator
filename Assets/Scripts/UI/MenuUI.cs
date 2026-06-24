@@ -14,10 +14,12 @@ namespace CookingSimulator.UI
         [SerializeField] private Button backButton;
 
         private Action onCookAgain;
+        private Action<DishData> onDishClicked;
 
-        public void ShowDishes(List<DishData> dishes, Action cookAgainAction)
+        public void ShowDishes(List<DishData> dishes, Action cookAgainAction, Action<DishData> dishClickedAction)
         {
             onCookAgain = cookAgainAction;
+            onDishClicked = dishClickedAction;
             gameObject.SetActive(true);
             ClearDishButtons();
             dishesText.text = "厨神菜单";
@@ -36,7 +38,6 @@ namespace CookingSimulator.UI
 
         public void BackToDishes()
         {
-            // 无操作，保留用于预制件兼容
         }
 
         private void CreateDishButton(DishData dish)
@@ -48,27 +49,23 @@ namespace CookingSimulator.UI
             {
                 label.text = $"{dish.name}  ￥{dish.price}  评分：{dish.score}";
             }
+
+            button.onClick.AddListener(() => onDishClicked?.Invoke(dish));
         }
 
         private void ClearDishButtons()
         {
             if (dishButtonTemplate != null)
-            {
                 dishButtonTemplate.gameObject.SetActive(false);
-            }
 
             if (dishesButtonRoot == null)
-            {
                 return;
-            }
 
             for (var index = dishesButtonRoot.childCount - 1; index >= 0; index--)
             {
                 var child = dishesButtonRoot.GetChild(index);
                 if (dishButtonTemplate != null && child == dishButtonTemplate.transform)
-                {
                     continue;
-                }
 
                 Destroy(child.gameObject);
             }
@@ -77,9 +74,7 @@ namespace CookingSimulator.UI
         private void SetBackButton(bool visible)
         {
             if (backButton != null)
-            {
                 backButton.gameObject.SetActive(visible);
-            }
         }
     }
 }

@@ -646,13 +646,41 @@ namespace CookingSimulator.Editor
             pageText.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 32);
             var nextBtn = CreateButton(navRow.transform, ">", 80);
 
-            var text = CreateScrollableTextArea(panel.transform);
+            // 拆分字段
+            var npcName = CreateText(panel.transform, "评价者");
+            npcName.fontSize = 28;
+            npcName.alignment = TextAnchor.MiddleLeft;
+            SetPreferredSize(npcName.gameObject, 700, 40);
+
+            var score = CreateText(panel.transform, "评分：--");
+            score.fontSize = 36;
+            score.alignment = TextAnchor.MiddleCenter;
+
+            var summary = CreateText(panel.transform, "评价内容...");
+            summary.fontSize = 22;
+            summary.alignment = TextAnchor.MiddleLeft;
+            SetPreferredSize(summary.gameObject, 700, 120);
+
+            var suggestion = CreateText(panel.transform, "建议：--");
+            suggestion.fontSize = 20;
+            suggestion.alignment = TextAnchor.MiddleLeft;
+            SetPreferredSize(suggestion.gameObject, 700, 60);
+
+            var reputation = CreateText(panel.transform, "声望 ±0");
+            reputation.fontSize = 22;
+            reputation.alignment = TextAnchor.MiddleCenter;
+
             var button = CreateButton(panel.transform, "返回食单");
             var buttonText = button.GetComponentInChildren<Text>();
+
+            Assign(panel, "npcNameText", npcName);
+            Assign(panel, "scoreText", score);
+            Assign(panel, "summaryText", summary);
+            Assign(panel, "suggestionText", suggestion);
+            Assign(panel, "reputationText", reputation);
             Assign(panel, "prevButton", prevBtn);
             Assign(panel, "nextButton", nextBtn);
             Assign(panel, "pageIndicator", pageText);
-            Assign(panel, "reviewText", text);
             Assign(panel, "continueButtonText", buttonText);
             UnityEventTools.AddPersistentListener(prevBtn.onClick, panel.PrevReview);
             UnityEventTools.AddPersistentListener(nextBtn.onClick, panel.NextReview);

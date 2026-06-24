@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace CookingSimulator.Models
 {
@@ -14,6 +15,7 @@ namespace CookingSimulator.Models
         public string logPath;
         public string reviewId;
         public string reviewText;
+        public List<string> reviewIds;
         public string createdAt;
     }
 }

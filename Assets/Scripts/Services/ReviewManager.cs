@@ -62,6 +62,7 @@ namespace CookingSimulator.Services
             {
                 reviewId = Guid.NewGuid().ToString("N"),
                 dishId = dishId,
+                reviewerName = "本地规则",
                 score = score,
                 summary = $"本地评价：完成 {completed.Count}/{required.Count} 个关键动作，得分 {score}。{donenessDetail}",
                 suggestion = suggestion,

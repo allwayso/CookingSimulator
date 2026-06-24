@@ -360,8 +360,9 @@ namespace CookingSimulator.Services
                 {
                     reviewId = Guid.NewGuid().ToString("N"),
                     dishId = dish.dishId,
+                    reviewerName = npcName,
                     score = Mathf.Clamp(payload.score, 0, 100),
-                    summary = $"{npcName}评价：" + payload.summary,
+                    summary = payload.summary,
                     suggestion = payload.suggestion,
                     reputationDelta = Mathf.Clamp(payload.reputationDelta, -5, 5),
                     createdAt = DateTime.UtcNow.ToString("O")
@@ -389,6 +390,7 @@ namespace CookingSimulator.Services
             {
                 reviewId = Guid.NewGuid().ToString("N"),
                 dishId = dish.dishId,
+                reviewerName = npcName,
                 score = baseReview.score,
                 summary = $"{npcName}暂时没连上，先按本地规则评价：{baseReview.summary}",
                 suggestion = baseReview.suggestion + "（AI 降级原因：" + reason + "）",
