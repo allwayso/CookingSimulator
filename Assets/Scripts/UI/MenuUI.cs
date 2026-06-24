@@ -39,7 +39,7 @@ namespace CookingSimulator.UI
             }
         }
 
-        public void ShowReviewers(DishData dish, Action backToDishesAction, Action<string> reviewerSelectedAction)
+        public void ShowReviewers(DishData dish, List<(string profileKey, string displayName)> reviewers, Action backToDishesAction, Action<string> reviewerSelectedAction)
         {
             selectedDish = dish;
             onBackToDishes = backToDishesAction;
@@ -48,7 +48,17 @@ namespace CookingSimulator.UI
             ClearDishButtons();
             SetBackButton(true);
             dishesText.text = $"{dish.name}品鉴名录";
-            CreateReviewerButton("AI 老八");
+
+            if (reviewers == null || reviewers.Count == 0)
+            {
+                dishesText.text = "暂无评审可选";
+                return;
+            }
+
+            foreach (var (profileKey, displayName) in reviewers)
+            {
+                CreateReviewerButton(displayName, profileKey);
+            }
         }
 
         public void CookAgain()
@@ -74,17 +84,17 @@ namespace CookingSimulator.UI
             button.onClick.AddListener(() => onDishSelected?.Invoke(dish));
         }
 
-        private void CreateReviewerButton(string reviewerName)
+        private void CreateReviewerButton(string displayName, string profileKey)
         {
             var button = Instantiate(dishButtonTemplate, dishesButtonRoot);
             button.gameObject.SetActive(true);
             var label = button.GetComponentInChildren<Text>();
             if (label != null)
             {
-                label.text = reviewerName;
+                label.text = displayName;
             }
 
-            button.onClick.AddListener(() => onReviewerSelected?.Invoke(reviewerName));
+            button.onClick.AddListener(() => onReviewerSelected?.Invoke(profileKey));
         }
 
         private void ClearDishButtons()

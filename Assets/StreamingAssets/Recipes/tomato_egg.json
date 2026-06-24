@@ -4,6 +4,7 @@
   "description": "MVP 默认菜谱，用于验证切菜、下锅、加热、调味、翻炒和出锅闭环。",
   "ingredients": ["番茄", "鸡蛋"],
   "seasonings": ["盐"],
+  "timedPopupDelays": [5, 10, 16, 22],
   "steps": [
     {
       "order": 1,
