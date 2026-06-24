@@ -26,6 +26,14 @@ public class 冰箱动画 : MonoBehaviour
         sr = GetComponent<SpriteRenderer>();
         if (frames.Length > 0 && frames[0] != null)
             sr.sprite = frames[0];
+
+        // 运行时 fallback：若 player 引用未注入（例如从 prefab 实例化），自动查找
+        if (player == null)
+        {
+            var playerObj = GameObject.Find("小人");
+            if (playerObj != null)
+                player = playerObj.transform;
+        }
     }
 
 

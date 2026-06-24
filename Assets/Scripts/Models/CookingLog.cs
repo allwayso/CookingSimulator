@@ -14,5 +14,6 @@ namespace CookingSimulator.Models
         public string finishedAt;
         public DishState finalState;
         public List<ActionRecord> records = new List<ActionRecord>();
+        public List<IngredientCookState> ingredientResults;
     }
 }

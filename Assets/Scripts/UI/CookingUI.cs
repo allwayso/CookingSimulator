@@ -1,269 +1,420 @@
 using System;
-using System.Collections;
 using CookingSimulator.Models;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace CookingSimulator.UI
 {
     public class CookingUI : MonoBehaviour
     {
-        [Header("Display")]
         [SerializeField] private Text recipeText;
-        [SerializeField] private Text stateText;
         [SerializeField] private Text hintText;
         [SerializeField] private Text messageText;
         [SerializeField] private Image dishStateImage;
 
+        [Header("Fire Control")]
+        [SerializeField] private Slider fireSlider;
+        [SerializeField] private Text fireLevelText;
+
         [Header("Timer")]
         [SerializeField] private Text timerText;
 
-        [Header("Popup")]
-        [SerializeField] private GameObject popupOverlay;
-        [SerializeField] private Text popupQuestionText;
-        [SerializeField] private Button popupYesButton;
+        [Header("Ingredient Doneness")]
+        [SerializeField] private Image tomatoDonenessImage;
+        [SerializeField] private Image eggDonenessImage;
+        [SerializeField] private Text tomatoDonenessText;
+        [SerializeField] private Text eggDonenessText;
+        [SerializeField] private Sprite[] tomatoSprites; // [0]=全生 [1]=半生 [2]=全熟 [3]=过头
+        [SerializeField] private Sprite[] eggSprites;
+        [SerializeField] private Image tomatoPlateImage;  // 番茄在盘上的显示
+        [SerializeField] private Image eggPlateImage;     // 鸡蛋在盘上的显示
 
-        [Header("Actions")]
-        [SerializeField] private Transform actionButtonRow;
+        [Header("Container Interaction")]
+        [SerializeField] private Button panButton;
+        [SerializeField] private Button plateButton;
+
+        [Header("Ingredient Selector")]
+        [SerializeField] private Button tomatoSelectBtn;
+        [SerializeField] private Button eggSelectBtn;
+        [SerializeField] private Text selectedIngredientText;
 
         private Action<string, string> onAction;
         private Action onFinish;
+        private Action onTransferToPlate;
+        private Action onTransferToPan;
+        private Action<int> onFireLevelChanged;
 
-        // Timed mode state
-        private Coroutine timedRoutine;
-        private float timerStartTime;
-        private float[] popupDelays;
-        private int currentPopupIndex;
-        private bool isTimedMode;
-        private DishState currentDisplayedState;
+        private string selectedIngredient = "鸡蛋";
 
-        private Action<string, string> onTimedPopupAction;
-        private Action<string, string> onTimedMissedAction;
-        private Action onTimedComplete;
-
-        private static readonly string[] TimedActions   = { "heat", "season", "stir", "finish" };
-        private static readonly string[] TimedTargets   = { "锅",   "盐",     "锅",   "菜品" };
-        private static readonly string[] TimedQuestions = { "是否加热？", "是否加调料？", "是否翻炒？", "是否出锅？" };
-
-        // ── Public API ──
+        private static readonly string[] FireLevelNames = { "关火", "小火", "中火", "大火", "猛火" };
 
         public void Show(RecipeData recipe, DishState state,
-            Action<string, string> actionHandler, Action finishHandler)
+            Action<string, string> actionHandler, Action finishHandler,
+            Action<int> fireLevelHandler,
+            Action transferToPlateHandler, Action transferToPanHandler)
         {
             onAction = actionHandler;
             onFinish = finishHandler;
+            onFireLevelChanged = fireLevelHandler;
+            onTransferToPlate = transferToPlateHandler;
+            onTransferToPan = transferToPanHandler;
             gameObject.SetActive(true);
             recipeText.text = recipe.name;
             messageText.text = string.Empty;
 
-            SetActionButtonsVisible(true);
-            isTimedMode = false;
+            // 默认选中鸡蛋
+            selectedIngredient = "鸡蛋";
+            UpdateIngredientSelection();
 
-            // For timed recipes, hide buttons 2-5 (加热/加调料/翻炒/出锅)
-            if (recipe.timedPopupDelays != null && recipe.timedPopupDelays.Length == 4)
+            // 初始化火力滑杆（默认小火）
+            if (fireSlider != null)
             {
-                for (int i = 2; i <= 5; i++)
-                    SetActionButtonVisible(i, false);
+                fireSlider.value = 1;
+                fireSlider.interactable = false;
+                UpdateFireLevelText(1);
             }
 
-            if (timerText != null) timerText.gameObject.SetActive(false);
-            if (popupOverlay != null) popupOverlay.SetActive(false);
+            // 初始化熟度显示
+            ResetDonenessDisplay();
+
+            // 初始化容器交互
+            SetContainerButtonsInteractable(false);
 
             UpdateState(state);
         }
 
         public void UpdateState(DishState state)
         {
-            currentDisplayedState = state;
-            stateText.text = $"当前状态：{state}";
-            hintText.text = GetHint(state, isTimedMode);
+            hintText.text = GetHint(state);
+
             if (dishStateImage != null)
+            {
                 dishStateImage.color = GetStateColor(state);
+            }
+
+            bool isCooking = state == DishState.Cooking;
+            SetFireSliderInteractable(isCooking);
+            SetContainerButtonsInteractable(isCooking);
         }
 
-        public void ShowMessage(string msg)
+        public void ShowMessage(string message)
         {
-            if (messageText != null) messageText.text = msg;
+            messageText.text = message;
         }
 
-        // ── Timed mode entry ──
-
-        public void StartTimedCooking(float[] delays,
-            Action<string, string> popupActionHandler,
-            Action<string, string> missedActionHandler,
-            Action timedCompleteHandler)
+        public void OnFireSliderChanged(float value)
         {
-            popupDelays = delays;
-            onTimedPopupAction = popupActionHandler;
-            onTimedMissedAction = missedActionHandler;
-            onTimedComplete = timedCompleteHandler;
-            isTimedMode = true;
-
-            SetActionButtonsVisible(false);
-
-            if (timerText != null) timerText.gameObject.SetActive(true);
-            timerText.text = "烹饪时间：0.00s";
-
-            UpdateState(currentDisplayedState);
-            timedRoutine = StartCoroutine(RunTimedCooking());
+            int level = Mathf.RoundToInt(value);
+            UpdateFireLevelText(level);
+            onFireLevelChanged?.Invoke(level);
         }
 
-        // ── Manual action buttons (guarded in timed mode) ──
+        public void UpdateIngredientDoneness(string ingredientName, DonenessLevel level)
+        {
+            var targetImage = GetIngredientImage(ingredientName);
+            var targetText = GetIngredientText(ingredientName);
+            var sprites = GetIngredientSprites(ingredientName);
+
+            if (targetText != null)
+                targetText.text = $"{ingredientName}: {GetDonenessName(level)}";
+
+            if (targetImage != null)
+            {
+                // 有精灵图就用精灵图，否则 fallback 到颜色
+                if (sprites != null && sprites.Length > (int)level && sprites[(int)level] != null)
+                    targetImage.sprite = sprites[(int)level];
+                else
+                    targetImage.color = GetDonenessColor(level);
+            }
+
+            // 盘图同步
+            var plateImage = GetIngredientPlateImage(ingredientName);
+            if (plateImage != null)
+            {
+                if (sprites != null && sprites.Length > (int)level && sprites[(int)level] != null)
+                    plateImage.sprite = sprites[(int)level];
+                else
+                    plateImage.color = GetDonenessColor(level);
+            }
+        }
+
+        public void SetFireSliderInteractable(bool interactable)
+        {
+            if (fireSlider != null)
+            {
+                fireSlider.interactable = interactable;
+            }
+        }
+
+        public void SetContainerButtonsInteractable(bool interactable)
+        {
+            if (panButton != null)
+                panButton.interactable = interactable;
+            if (plateButton != null)
+                plateButton.interactable = interactable;
+        }
+
+        public void UpdateTimer(float elapsedSeconds)
+        {
+            if (timerText != null)
+            {
+                int minutes = Mathf.FloorToInt(elapsedSeconds / 60f);
+                int seconds = Mathf.FloorToInt(elapsedSeconds % 60f);
+                timerText.text = $"⏱ {minutes:00}:{seconds:00}";
+            }
+        }
+
+        /// <summary>更新容器内容物显示</summary>
+        public void UpdateContainerDisplay(bool hasPanContent, bool hasPlateContent)
+        {
+            if (panButton != null)
+            {
+                var img = panButton.GetComponent<Image>();
+                if (img != null)
+                    img.color = hasPanContent ? new Color(0.6f, 0.35f, 0.18f) : new Color(0.25f, 0.2f, 0.15f);
+            }
+
+            if (plateButton != null)
+            {
+                var img = plateButton.GetComponent<Image>();
+                if (img != null)
+                    img.color = hasPlateContent ? new Color(0.95f, 0.92f, 0.85f) : new Color(0.5f, 0.48f, 0.45f);
+            }
+        }
+
+        /// <summary>按食材更新图片可见性：未激活→隐藏，锅中→锅图，盘上→盘图</summary>
+        public void UpdateIngredientVisibility(string ingredientName, bool hasActivated, bool isInPan)
+        {
+            var panImg = GetIngredientImage(ingredientName);
+            var plateImg = GetIngredientPlateImage(ingredientName);
+
+            if (panImg != null) panImg.gameObject.SetActive(hasActivated && isInPan);
+            if (plateImg != null) plateImg.gameObject.SetActive(hasActivated && !isInPan);
+        }
+
+        // ── 食材选择 ──
+
+        public void SelectIngredient(string ingredientName)
+        {
+            selectedIngredient = ingredientName;
+            UpdateIngredientSelection();
+        }
+
+        public void SelectTomato()
+        {
+            SelectIngredient("番茄");
+        }
+
+        public void SelectEgg()
+        {
+            SelectIngredient("鸡蛋");
+        }
+
+        private void UpdateIngredientSelection()
+        {
+            if (selectedIngredientText != null)
+                selectedIngredientText.text = $"下锅: {selectedIngredient}";
+
+            // 高亮选中按钮
+            if (tomatoSelectBtn != null)
+            {
+                var img = tomatoSelectBtn.GetComponent<Image>();
+                if (img != null)
+                    img.color = selectedIngredient.Contains("番茄")
+                        ? new Color(0.95f, 0.65f, 0.2f)
+                        : new Color(0.35f, 0.25f, 0.15f);
+            }
+
+            if (eggSelectBtn != null)
+            {
+                var img = eggSelectBtn.GetComponent<Image>();
+                if (img != null)
+                    img.color = selectedIngredient.Contains("鸡蛋")
+                        ? new Color(0.95f, 0.65f, 0.2f)
+                        : new Color(0.35f, 0.25f, 0.15f);
+            }
+        }
+
+        // ── 容器交互 ──
+
+        public void OnPanClicked()
+        {
+            onTransferToPlate?.Invoke();
+        }
+
+        public void OnPlateClicked()
+        {
+            onTransferToPan?.Invoke();
+        }
+
+        // ── 动作按钮 ──
 
         public void Cut()
         {
-            if (!isTimedMode) onAction?.Invoke("cut", "番茄");
+            onAction?.Invoke("cut", "番茄");
         }
 
         public void PutInPan()
         {
-            if (!isTimedMode) onAction?.Invoke("put_in_pan", "食材");
-        }
-
-        public void Heat()
-        {
-            if (!isTimedMode) onAction?.Invoke("heat", "锅");
+            onAction?.Invoke("put_in_pan", selectedIngredient);
         }
 
         public void Season()
         {
-            if (!isTimedMode) onAction?.Invoke("season", "盐");
+            onAction?.Invoke("season", "盐");
         }
 
         public void Stir()
         {
-            if (!isTimedMode) onAction?.Invoke("stir", "锅");
+            onAction?.Invoke("stir", "锅");
         }
 
         public void Finish()
         {
-            if (!isTimedMode) onFinish?.Invoke();
+            onFinish?.Invoke();
         }
 
-        // ── Timed cooking coroutines ──
+        // ── 辅助方法 ──
 
-        private IEnumerator RunTimedCooking()
+        private void UpdateFireLevelText(int level)
         {
-            timerStartTime = Time.time;
-            currentPopupIndex = 0;
-
-            while (currentPopupIndex < popupDelays.Length)
+            if (fireLevelText != null)
             {
-                float elapsed = Time.time - timerStartTime;
-                UpdateTimerDisplay(elapsed);
+                fireLevelText.text = FireLevelNames[Mathf.Clamp(level, 0, FireLevelNames.Length - 1)];
+            }
+        }
 
-                if (elapsed >= popupDelays[currentPopupIndex])
-                {
-                    yield return StartCoroutine(ShowPopupRoutine(currentPopupIndex));
-                    currentPopupIndex++;
-                }
+        private void ResetDonenessDisplay()
+        {
+            if (tomatoDonenessText != null)
+                tomatoDonenessText.text = "番茄: 全生";
+            if (eggDonenessText != null)
+                eggDonenessText.text = "鸡蛋: 全生";
 
-                yield return null;
+            // 设置初始精灵
+            if (tomatoDonenessImage != null)
+            {
+                if (tomatoSprites != null && tomatoSprites.Length > 0 && tomatoSprites[0] != null)
+                    tomatoDonenessImage.sprite = tomatoSprites[0];
+                else
+                    tomatoDonenessImage.color = GetDonenessColor(DonenessLevel.Raw);
+            }
+            if (eggDonenessImage != null)
+            {
+                if (eggSprites != null && eggSprites.Length > 0 && eggSprites[0] != null)
+                    eggDonenessImage.sprite = eggSprites[0];
+                else
+                    eggDonenessImage.color = GetDonenessColor(DonenessLevel.Raw);
             }
 
-            HideTimerAndPopup();
-            onTimedComplete?.Invoke();
+            // 全部隐藏，等待下锅后才显示
+            HideAllIngredientImages();
         }
 
-        private IEnumerator ShowPopupRoutine(int index)
+        private void HideAllIngredientImages()
         {
-            if (index >= TimedActions.Length) yield break;
-
-            string actionName = TimedActions[index];
-            string targetName = TimedTargets[index];
-            string question   = TimedQuestions[index];
-
-            if (popupOverlay != null)
+            if (tomatoDonenessImage != null) tomatoDonenessImage.gameObject.SetActive(false);
+            if (eggDonenessImage != null) eggDonenessImage.gameObject.SetActive(false);
+            if (tomatoPlateImage != null)
             {
-                popupOverlay.SetActive(true);
-                if (popupQuestionText != null) popupQuestionText.text = question;
+                if (tomatoSprites != null && tomatoSprites.Length > 0 && tomatoSprites[0] != null)
+                    tomatoPlateImage.sprite = tomatoSprites[0];
+                tomatoPlateImage.gameObject.SetActive(false);
             }
-
-            bool clickedYes = false;
-
-            UnityAction yesHandler = null;
-            yesHandler = () =>
+            if (eggPlateImage != null)
             {
-                clickedYes = true;
-                if (popupYesButton != null) popupYesButton.onClick.RemoveListener(yesHandler);
-            };
-
-            if (popupYesButton != null)
-            {
-                popupYesButton.onClick.RemoveAllListeners();
-                popupYesButton.onClick.AddListener(yesHandler);
+                if (eggSprites != null && eggSprites.Length > 0 && eggSprites[0] != null)
+                    eggPlateImage.sprite = eggSprites[0];
+                eggPlateImage.gameObject.SetActive(false);
             }
+        }
 
-            // 3-second window
-            float popupStart = Time.time;
-            while (Time.time - popupStart < 3f && !clickedYes)
+        private Image GetIngredientImage(string ingredientName)
+        {
+            if (ingredientName.Contains("番茄"))
+                return tomatoDonenessImage;
+            if (ingredientName.Contains("鸡蛋"))
+                return eggDonenessImage;
+            return null;
+        }
+
+        private Text GetIngredientText(string ingredientName)
+        {
+            if (ingredientName.Contains("番茄"))
+                return tomatoDonenessText;
+            if (ingredientName.Contains("鸡蛋"))
+                return eggDonenessText;
+            return null;
+        }
+
+        private Sprite[] GetIngredientSprites(string ingredientName)
+        {
+            if (ingredientName.Contains("番茄"))
+                return tomatoSprites;
+            if (ingredientName.Contains("鸡蛋"))
+                return eggSprites;
+            return null;
+        }
+
+        private Image GetIngredientPlateImage(string ingredientName)
+        {
+            if (ingredientName.Contains("番茄"))
+                return tomatoPlateImage;
+            if (ingredientName.Contains("鸡蛋"))
+                return eggPlateImage;
+            return null;
+        }
+
+        private static string GetDonenessName(DonenessLevel level)
+        {
+            switch (level)
             {
-                UpdateTimerDisplay(Time.time - timerStartTime);
-                yield return null;
+                case DonenessLevel.Raw:
+                    return "全生";
+                case DonenessLevel.HalfCooked:
+                    return "半生";
+                case DonenessLevel.FullyCooked:
+                    return "全熟";
+                case DonenessLevel.Overcooked:
+                    return "过头";
+                default:
+                    return "未知";
             }
-
-            if (popupOverlay != null) popupOverlay.SetActive(false);
-            if (popupYesButton != null) popupYesButton.onClick.RemoveAllListeners();
-
-            if (clickedYes)
-                onTimedPopupAction?.Invoke(actionName, targetName);
-            else
-                onTimedMissedAction?.Invoke(actionName, targetName);
         }
 
-        // ── Helpers ──
-
-        private void UpdateTimerDisplay(float elapsed)
+        private static Color GetDonenessColor(DonenessLevel level)
         {
-            if (timerText == null) return;
-            int sec = Mathf.FloorToInt(elapsed);
-            int ms  = Mathf.FloorToInt((elapsed - sec) * 100);
-            timerText.text = $"烹饪时间：{sec}.{ms:D2}s";
-        }
-
-        private void HideTimerAndPopup()
-        {
-            if (timerText != null) timerText.gameObject.SetActive(false);
-            if (popupOverlay != null) popupOverlay.SetActive(false);
-        }
-
-        private void SetActionButtonsVisible(bool visible)
-        {
-            if (actionButtonRow == null) return;
-            for (int i = 0; i < actionButtonRow.childCount; i++)
-                actionButtonRow.GetChild(i).gameObject.SetActive(visible);
-        }
-
-        private void SetActionButtonVisible(int index, bool visible)
-        {
-            if (actionButtonRow == null || index < 0 || index >= actionButtonRow.childCount) return;
-            actionButtonRow.GetChild(index).gameObject.SetActive(visible);
-        }
-
-        private static string GetHint(DishState state, bool timed)
-        {
-            if (timed)
+            switch (level)
             {
-                switch (state)
-                {
-                    case DishState.Raw:      return "先切菜，再下锅。";
-                    case DishState.Cut:      return "点击\"下锅\"开始计时烹饪！";
-                    case DishState.Cooking:  return "注意弹窗提示，在3秒内点击\"是\"！";
-                    case DishState.Seasoned: return "注意弹窗提示，在3秒内点击\"是\"！";
-                    case DishState.Done:     return "菜品完成，进入评价。";
-                    default: return string.Empty;
-                }
+                case DonenessLevel.Raw:
+                    return new Color(0.82f, 0.25f, 0.2f);
+                case DonenessLevel.HalfCooked:
+                    return new Color(0.95f, 0.65f, 0.2f);
+                case DonenessLevel.FullyCooked:
+                    return new Color(0.28f, 0.68f, 0.34f);
+                case DonenessLevel.Overcooked:
+                    return new Color(0.3f, 0.15f, 0.1f);
+                default:
+                    return Color.white;
             }
+        }
 
+        private static string GetHint(DishState state)
+        {
             switch (state)
             {
-                case DishState.Raw:      return "当前步骤：先切菜。";
-                case DishState.Cut:      return "当前步骤：把食材下锅。";
-                case DishState.Cooking:  return "当前步骤：加热后加入调料。";
-                case DishState.Seasoned: return "当前步骤：翻炒均匀后出锅。";
-                case DishState.Done:     return "当前步骤：菜品完成，进入评价。";
-                default: return string.Empty;
+                case DishState.Raw:
+                    return "当前步骤：先切菜。";
+                case DishState.Cut:
+                    return "当前步骤：选择食材后点击下锅。";
+                case DishState.Cooking:
+                    return "调节火力控制熟度。点击锅盛出到盘子，点击盘子倒回锅中。";
+                case DishState.Seasoned:
+                    return "当前步骤：翻炒均匀后出锅。";
+                case DishState.Done:
+                    return "当前步骤：菜品完成，进入评价。";
+                default:
+                    return string.Empty;
             }
         }
 
@@ -271,12 +422,18 @@ namespace CookingSimulator.UI
         {
             switch (state)
             {
-                case DishState.Raw:      return new Color(0.82f, 0.25f, 0.2f);
-                case DishState.Cut:      return new Color(0.95f, 0.46f, 0.25f);
-                case DishState.Cooking:  return new Color(0.95f, 0.65f, 0.2f);
-                case DishState.Seasoned: return new Color(0.28f, 0.68f, 0.34f);
-                case DishState.Done:     return new Color(0.95f, 0.88f, 0.56f);
-                default: return Color.white;
+                case DishState.Raw:
+                    return new Color(0.82f, 0.25f, 0.2f);
+                case DishState.Cut:
+                    return new Color(0.95f, 0.46f, 0.25f);
+                case DishState.Cooking:
+                    return new Color(0.95f, 0.65f, 0.2f);
+                case DishState.Seasoned:
+                    return new Color(0.28f, 0.68f, 0.34f);
+                case DishState.Done:
+                    return new Color(0.95f, 0.88f, 0.56f);
+                default:
+                    return Color.white;
             }
         }
     }

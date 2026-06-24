@@ -17,8 +17,15 @@ namespace CookingSimulator.Editor
         [MenuItem("Cooking Simulator/Build MVP Scene")]
         public static void BuildScene()
         {
+            // 如果 prefab 尚未升级（缺少新 UI 元素），先自动升级
+            UpgradeCookingPanelPrefab();
+
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "MVP";
+
+            EnsureFridgePrefabExists();
+            EnsureCharacterPrefabExists();
+            EnsureStovePrefabExists();
 
             var loginBackground = CreateLoginBackground();
             var character = CreateCharacter();
@@ -83,6 +90,7 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "interactionManager", interactionManager);
             Assign(gameManager, "ingredientSelectUI", ingredientSelect);
             Assign(gameManager, "playerObject", character);
+            Assign(gameManager, "fridgeObject", fridge);
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
@@ -148,7 +156,28 @@ namespace CookingSimulator.Editor
             return background;
         }
 
+        private static void EnsureCharacterPrefabExists()
+        {
+            const string path = "Assets/prefab/kitchen/Character.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+                return;
+
+            var character = BuildCharacterAsset();
+            PrefabUtility.SaveAsPrefabAsset(character, path);
+            UnityEngine.Object.DestroyImmediate(character);
+            AssetDatabase.SaveAssets();
+        }
+
         private static GameObject CreateCharacter()
+        {
+            const string path = "Assets/prefab/kitchen/Character.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            var character = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            character.name = "小人"; // 保持原名，冰箱动画运行时查找依赖此名称
+            return character;
+        }
+
+        private static GameObject BuildCharacterAsset()
         {
             const string spriteSheetPath = "Assets/character/sprite sheet init.png";
             var subSprites = AssetDatabase.LoadAllAssetsAtPath(spriteSheetPath);
@@ -173,6 +202,7 @@ namespace CookingSimulator.Editor
 
             var sr = character.AddComponent<SpriteRenderer>();
             sr.sprite = idleSprite;
+            sr.sortingOrder = 5; // 确保角色渲染在 tilemap 层之上
 
             var move = character.AddComponent<人物移动>();
             var moveSO = new SerializedObject(move);
@@ -192,7 +222,39 @@ namespace CookingSimulator.Editor
             return character;
         }
 
+        private static void EnsureFridgePrefabExists()
+        {
+            const string path = "Assets/prefab/kitchen/Fridge.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+                return;
+
+            var fridge = BuildFridgeAsset();
+            Directory.CreateDirectory("Assets/prefab/kitchen");
+            PrefabUtility.SaveAsPrefabAsset(fridge, path);
+            UnityEngine.Object.DestroyImmediate(fridge);
+            AssetDatabase.SaveAssets();
+        }
+
         private static GameObject CreateFridge(Transform playerTransform)
+        {
+            const string path = "Assets/prefab/kitchen/Fridge.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            var fridge = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            fridge.name = "Fridge 1 _0"; // 保持原名，人物移动碰撞检测依赖此名称
+
+            // 注入运行时引用（prefab 无法预置 player 引用）
+            var anim = fridge.GetComponent<冰箱动画>();
+            if (anim != null && playerTransform != null)
+            {
+                var animSO = new SerializedObject(anim);
+                animSO.FindProperty("player").objectReferenceValue = playerTransform;
+                animSO.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            return fridge;
+        }
+
+        private static GameObject BuildFridgeAsset()
         {
             var fridge = new GameObject("Fridge 1 _0");
             fridge.transform.position = new Vector3(-0.08f, -0.36f, 0f);
@@ -206,10 +268,10 @@ namespace CookingSimulator.Editor
 
             var sr = fridge.AddComponent<SpriteRenderer>();
             sr.sprite = frame0;
+            sr.sortingOrder = 5; // 确保渲染在 tilemap 层之上（floor=0, border=1, otherStuff=2）
 
             var anim = fridge.AddComponent<冰箱动画>();
             var animSO = new SerializedObject(anim);
-            animSO.FindProperty("player").objectReferenceValue = playerTransform;
             animSO.FindProperty("triggerDistance").floatValue = 4f;
             animSO.FindProperty("frameDuration").floatValue = 0.12f;
 
@@ -234,7 +296,26 @@ namespace CookingSimulator.Editor
             return fridge;
         }
 
+        private static void EnsureStovePrefabExists()
+        {
+            const string path = "Assets/prefab/kitchen/Stove.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+                return;
+
+            var stove = BuildStoveAsset();
+            PrefabUtility.SaveAsPrefabAsset(stove, path);
+            UnityEngine.Object.DestroyImmediate(stove);
+            AssetDatabase.SaveAssets();
+        }
+
         private static GameObject CreateStove(Transform playerTransform)
+        {
+            const string path = "Assets/prefab/kitchen/Stove.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            return PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+        }
+
+        private static GameObject BuildStoveAsset()
         {
             var stove = new GameObject("灶台");
             stove.transform.position = new Vector3(7f, 2.76f, 0f);
@@ -245,6 +326,7 @@ namespace CookingSimulator.Editor
 
             var sr = stove.AddComponent<SpriteRenderer>();
             sr.sprite = stoveSprite;
+            sr.sortingOrder = 5; // 确保渲染在 tilemap 层之上
 
             // 灶台动画（静态精灵）
             var anim = stove.AddComponent<灶台动画>();
@@ -441,142 +523,472 @@ namespace CookingSimulator.Editor
 
         private static CookingUI CreateCookingPanel(Transform parent)
         {
-            var panel = CreatePanel<CookingUI>(parent, "CookingPanel");
-            var recipe = CreateTitle(panel.transform, "做菜");
+            const string prefabPath = "Assets/prefab/UI/CookingPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
 
-            // Timer text (hidden by default)
-            var timerText = CreateText(panel.transform, "");
-            timerText.fontSize = 28;
-            timerText.gameObject.SetActive(false);
+            var instance = PrefabUtility.InstantiatePrefab(prefab, parent) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
 
-            CreateKitchenVisual(panel.transform, out var dishStateImage);
-            var state = CreateText(panel.transform, "当前状态");
-            var hint = CreateText(panel.transform, "提示");
-            var message = CreateText(panel.transform, string.Empty);
-            Assign(panel, "recipeText", recipe);
-            Assign(panel, "stateText", state);
-            Assign(panel, "hintText", hint);
-            Assign(panel, "messageText", message);
-            Assign(panel, "dishStateImage", dishStateImage);
-            Assign(panel, "timerText", timerText);
-
-            var actions = CreateButtonRow(panel.transform);
-            Assign(panel, "actionButtonRow", actions.transform);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "切菜", 120).onClick, panel.Cut);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "下锅", 120).onClick, panel.PutInPan);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加热", 120).onClick, panel.Heat);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "加调料", 120).onClick, panel.Season);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "翻炒", 120).onClick, panel.Stir);
-            UnityEventTools.AddPersistentListener(CreateButton(actions.transform, "出锅", 120).onClick, panel.Finish);
-
-            // Timed popup overlay (hidden by default)
-            CreateTimedPopupOverlay(panel.transform, panel);
-
-            return panel;
+            instance.name = "CookingPanel";
+            return instance.GetComponent<CookingUI>();
         }
 
-        private static void CreateTimedPopupOverlay(Transform parent, CookingUI cookingUI)
+        /// <summary>
+        /// 一次性升级 CookingPanel.prefab
+        /// </summary>
+        [MenuItem("Cooking Simulator/Upgrade CookingPanel Prefab")]
+        public static void UpgradeCookingPanelPrefab()
         {
-            var overlayObj = new GameObject("TimedPopupOverlay", typeof(RectTransform));
-            overlayObj.transform.SetParent(parent, false);
-            var rect = overlayObj.GetComponent<RectTransform>();
+            const string prefabPath = "Assets/prefab/UI/CookingPanel.prefab";
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (existing == null)
+            {
+                Debug.LogError($"Prefab not found: {prefabPath}");
+                return;
+            }
+
+            using (var scope = new PrefabUtility.EditPrefabContentsScope(prefabPath))
+            {
+                var root = scope.prefabContentsRoot;
+                var cookingUI = root.GetComponent<CookingUI>();
+                if (cookingUI == null)
+                {
+                    Debug.LogError("CookingPanel prefab must have CookingUI component.");
+                    return;
+                }
+
+                Debug.Log("Upgrading CookingPanel prefab (delta)...");
+
+                // 每个元素独立检测，只补缺失的
+
+                // 1. 移除旧的"加热"按钮
+                RemoveHeatButton(root.transform);
+
+                // 2. 计时器
+                if (root.transform.Find("TimerText") == null)
+                    Assign(cookingUI, "timerText", CreateTimerLabel(root.transform));
+
+                // 3. 锅按钮化 + 盘子
+                var potChild = root.transform.Find("pot");
+                if (potChild != null && potChild.GetComponent<Button>() == null)
+                {
+                    ButtonizePan(root.transform, out var panBtn);
+                    Assign(cookingUI, "panButton", panBtn);
+                    UnityEventTools.AddPersistentListener(panBtn.onClick, cookingUI.OnPanClicked);
+                }
+                if (root.transform.Find("Plate") == null)
+                {
+                    var plateBtn = CreatePlate(root.transform);
+                    Assign(cookingUI, "plateButton", plateBtn);
+                    UnityEventTools.AddPersistentListener(plateBtn.onClick, cookingUI.OnPlateClicked);
+                }
+
+                // 4. 食材选择行
+                if (root.transform.Find("IngredientSelector") == null)
+                {
+                    CreateIngredientSelector(root.transform, out var tBtn, out var eBtn, out var sTxt);
+                    Assign(cookingUI, "tomatoSelectBtn", tBtn);
+                    Assign(cookingUI, "eggSelectBtn", eBtn);
+                    Assign(cookingUI, "selectedIngredientText", sTxt);
+                    UnityEventTools.AddPersistentListener(tBtn.onClick, cookingUI.SelectTomato);
+                    UnityEventTools.AddPersistentListener(eBtn.onClick, cookingUI.SelectEgg);
+                }
+
+                // 5. 食材熟度行
+                if (root.transform.Find("IngredientDoneness") == null)
+                {
+                    CreateDonenessRow(root.transform, out var tImg, out var eImg, out var tTxt, out var eTxt);
+                    Assign(cookingUI, "tomatoDonenessImage", tImg);
+                    Assign(cookingUI, "eggDonenessImage", eImg);
+                    Assign(cookingUI, "tomatoDonenessText", tTxt);
+                    Assign(cookingUI, "eggDonenessText", eTxt);
+                }
+
+                // 6. 盘子上的食材图片
+                if (root.transform.Find("TomatoPlateImage") == null)
+                    Assign(cookingUI, "tomatoPlateImage", CreatePlateIngredientImage(root.transform, "TomatoPlateImage"));
+                if (root.transform.Find("EggPlateImage") == null)
+                    Assign(cookingUI, "eggPlateImage", CreatePlateIngredientImage(root.transform, "EggPlateImage"));
+
+                // 7. 火力滑杆行
+                if (root.transform.Find("FireControl") == null)
+                {
+                    CreateFireControlRow(root.transform, out var fs, out var flt);
+                    Assign(cookingUI, "fireSlider", fs);
+                    Assign(cookingUI, "fireLevelText", flt);
+                    UnityEventTools.AddPersistentListener(fs.onValueChanged, cookingUI.OnFireSliderChanged);
+                }
+
+                Debug.Log("CookingPanel prefab upgrade complete.");
+            }
+
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// 给 prefab 中的 "pot" Image 添加 Button 组件使其可点击
+        /// </summary>
+        private static void ButtonizePan(Transform root, out Button panButton)
+        {
+            panButton = null;
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == "pot")
+                {
+                    panButton = child.gameObject.AddComponent<Button>();
+                    return;
+                }
+            }
+
+            // fallback: 如果找不到 pot，创建一个
+            var fallback = new GameObject("pot", typeof(RectTransform), typeof(Image), typeof(Button));
+            fallback.transform.SetParent(root, false);
+            var rect = fallback.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(420, 200);
-
-            var image = overlayObj.AddComponent<Image>();
-            image.color = new Color(0.08f, 0.07f, 0.06f, 0.92f);
-
-            var outline = overlayObj.AddComponent<Outline>();
-            outline.effectColor = new Color(0.94f, 0.76f, 0.38f, 1f);
-            outline.effectDistance = new Vector2(4, -4);
-
-            // Ignore parent VerticalLayoutGroup so this sits centered on top
-            var ignoreLayout = overlayObj.AddComponent<LayoutElement>();
-            ignoreLayout.ignoreLayout = true;
-
-            var layout = overlayObj.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(28, 28, 28, 28);
-            layout.spacing = 18;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = false;
-            layout.childControlHeight = false;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-
-            overlayObj.SetActive(false);
-
-            var questionText = CreateText(overlayObj.transform, "是否加热？");
-            questionText.fontSize = 28;
-            questionText.alignment = TextAnchor.MiddleCenter;
-
-            var yesButton = CreateButton(overlayObj.transform, "是", 160);
-
-            Assign(cookingUI, "popupOverlay", overlayObj);
-            Assign(cookingUI, "popupQuestionText", questionText);
-            Assign(cookingUI, "popupYesButton", yesButton);
+            rect.sizeDelta = new Vector2(120, 120);
+            fallback.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.09f);
+            panButton = fallback.GetComponent<Button>();
         }
 
-        private static GameObject CreateButtonRow(Transform parent)
+        /// <summary>
+        /// 创建盘子：一个可点击的 Image+Button
+        /// </summary>
+        private static Button CreatePlate(Transform parent)
         {
-            var row = new GameObject("ActionButtonRow", typeof(RectTransform));
-            row.transform.SetParent(parent, false);
-            SetPreferredSize(row, 840, 56);
-            var layout = row.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 10;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = false;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-            return row;
+            var plate = new GameObject("Plate", typeof(RectTransform), typeof(Image), typeof(Button));
+            plate.transform.SetParent(parent, false);
+            var rect = plate.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(260, -30);
+            rect.sizeDelta = new Vector2(100, 24);
+            var img = plate.GetComponent<Image>();
+            img.color = new Color(0.5f, 0.48f, 0.45f);
+            var btn = plate.GetComponent<Button>();
+
+            // 盘子标签
+            var label = CreateText(plate.transform, "盘子");
+            label.fontSize = 16;
+            label.color = new Color(0.9f, 0.88f, 0.8f);
+            var labelRect = label.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            btn.interactable = false;
+            return btn;
         }
 
-        private static void CreateKitchenVisual(Transform parent, out Image dishStateImage)
-        {
-            var stage = new GameObject("KitchenVisual", typeof(RectTransform));
-            stage.transform.SetParent(parent, false);
-            SetPreferredSize(stage, 760, 220);
-            var background = stage.AddComponent<Image>();
-            background.color = new Color(0.22f, 0.2f, 0.17f);
-
-            CreateVisualBlock(stage.transform, "BackWall", new Vector2(0, 58), new Vector2(720, 90), new Color(0.55f, 0.5f, 0.42f));
-            CreateVisualBlock(stage.transform, "Counter", new Vector2(0, -52), new Vector2(720, 70), new Color(0.35f, 0.27f, 0.2f));
-            CreateVisualBlock(stage.transform, "Pan", new Vector2(0, -20), new Vector2(230, 86), new Color(0.08f, 0.09f, 0.09f));
-            CreateVisualBlock(stage.transform, "PanInner", new Vector2(0, -20), new Vector2(176, 48), new Color(0.16f, 0.17f, 0.16f));
-            CreateVisualBlock(stage.transform, "Tomato", new Vector2(-250, -30), new Vector2(78, 58), new Color(0.82f, 0.25f, 0.2f));
-            CreateVisualBlock(stage.transform, "Egg", new Vector2(-165, -30), new Vector2(74, 54), new Color(0.95f, 0.88f, 0.56f));
-            CreateVisualBlock(stage.transform, "Seasoning", new Vector2(258, -22), new Vector2(58, 96), new Color(0.9f, 0.92f, 0.88f));
-            CreateVisualBlock(stage.transform, "Flame", new Vector2(0, -84), new Vector2(120, 24), new Color(0.95f, 0.42f, 0.18f));
-
-            dishStateImage = CreateVisualBlock(stage.transform, "DishStateColor", new Vector2(0, -20), new Vector2(118, 38), new Color(0.82f, 0.25f, 0.2f));
-        }
-
-        private static Image CreateVisualBlock(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, Color color)
+        /// <summary>
+        /// 创建盘子上的食材图片（初始隐藏）
+        /// </summary>
+        private static Image CreatePlateIngredientImage(Transform parent, string name)
         {
             var obj = new GameObject(name, typeof(RectTransform));
             obj.transform.SetParent(parent, false);
             var rect = obj.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
-            var image = obj.AddComponent<Image>();
-            image.color = color;
-            return image;
+            rect.anchoredPosition = new Vector2(260, -10);
+            rect.sizeDelta = new Vector2(64, 64);
+            var img = obj.AddComponent<Image>();
+            img.color = Color.white;
+            obj.SetActive(false);
+            return img;
+        }
+
+        /// <summary>
+        /// 创建食材选择行：番茄/鸡蛋按钮 + 选中文本
+        /// </summary>
+        private static void CreateIngredientSelector(Transform parent,
+            out Button tomatoBtn, out Button eggBtn, out Text selText)
+        {
+            var row = new GameObject("IngredientSelector", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            SetPreferredSize(row, 760, 44);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 12;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            var label = CreateText(row.transform, "选择食材:");
+            label.fontSize = 18;
+            label.GetComponent<RectTransform>().sizeDelta = new Vector2(120, 32);
+
+            // 番茄按钮
+            var tomatoObj = new GameObject("TomatoSelectBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+            tomatoObj.transform.SetParent(row.transform, false);
+            SetPreferredSize(tomatoObj, 96, 36);
+            tomatoObj.GetComponent<Image>().color = new Color(0.35f, 0.25f, 0.15f);
+            tomatoBtn = tomatoObj.GetComponent<Button>();
+            var tomatoLabel = CreateText(tomatoObj.transform, "番茄");
+            tomatoLabel.fontSize = 20;
+            StretchChild(tomatoLabel.gameObject, 0, 0, 0, 0);
+
+            // 鸡蛋按钮
+            var eggObj = new GameObject("EggSelectBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+            eggObj.transform.SetParent(row.transform, false);
+            SetPreferredSize(eggObj, 96, 36);
+            eggObj.GetComponent<Image>().color = new Color(0.35f, 0.25f, 0.15f);
+            eggBtn = eggObj.GetComponent<Button>();
+            var eggLabel = CreateText(eggObj.transform, "鸡蛋");
+            eggLabel.fontSize = 20;
+            StretchChild(eggLabel.gameObject, 0, 0, 0, 0);
+
+            // 选中文本
+            selText = CreateText(row.transform, "下锅: 鸡蛋");
+            selText.fontSize = 20;
+            selText.color = new Color(0.95f, 0.88f, 0.56f);
+            selText.GetComponent<RectTransform>().sizeDelta = new Vector2(160, 32);
+        }
+
+        /// <summary>
+        /// 在 prefab 实例中查找并移除"加热"按钮（CookingUI.Heat() 已删除，由火力滑杆替代）
+        /// </summary>
+        private static void RemoveHeatButton(Transform root)
+        {
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name.Contains("加热"))
+                {
+                    UnityEngine.Object.DestroyImmediate(child.gameObject);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 创建左上角烹饪计时器
+        /// </summary>
+        private static Text CreateTimerLabel(Transform parent)
+        {
+            var timerObj = new GameObject("TimerText", typeof(RectTransform));
+            timerObj.transform.SetParent(parent, false);
+            var rect = timerObj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(0, 1);
+            rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(16, -16);
+            rect.sizeDelta = new Vector2(160, 40);
+            var text = timerObj.AddComponent<Text>();
+            text.text = "⏱ 00:00";
+            text.fontSize = 28;
+            text.color = new Color(0.95f, 0.88f, 0.56f);
+            text.alignment = TextAnchor.MiddleLeft;
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            return text;
+        }
+
+        private static void CreateDonenessRow(Transform parent,
+            out Image tomatoImage, out Image eggImage,
+            out Text tomatoText, out Text eggText)
+        {
+            var row = new GameObject("IngredientDoneness", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            SetPreferredSize(row, 760, 64);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 40;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            // 番茄熟度组
+            var tomatoGroup = new GameObject("TomatoGroup", typeof(RectTransform));
+            tomatoGroup.transform.SetParent(row.transform, false);
+            SetPreferredSize(tomatoGroup, 240, 56);
+            var tomatoGroupLayout = tomatoGroup.AddComponent<HorizontalLayoutGroup>();
+            tomatoGroupLayout.spacing = 8;
+            tomatoGroupLayout.childAlignment = TextAnchor.MiddleCenter;
+            tomatoGroupLayout.childControlWidth = false;
+            tomatoGroupLayout.childControlHeight = false;
+            tomatoGroupLayout.childForceExpandWidth = false;
+            tomatoGroupLayout.childForceExpandHeight = false;
+
+            var tomatoImgObj = new GameObject("TomatoImage", typeof(RectTransform));
+            tomatoImgObj.transform.SetParent(tomatoGroup.transform, false);
+            SetPreferredSize(tomatoImgObj, 48, 48);
+            tomatoImage = tomatoImgObj.AddComponent<Image>();
+            tomatoImage.color = new Color(0.82f, 0.25f, 0.2f);
+
+            tomatoText = CreateText(tomatoGroup.transform, "番茄: 全生");
+            tomatoText.fontSize = 20;
+            var tomatoTextRect = tomatoText.GetComponent<RectTransform>();
+            tomatoTextRect.sizeDelta = new Vector2(172, 32);
+
+            // 鸡蛋熟度组
+            var eggGroup = new GameObject("EggGroup", typeof(RectTransform));
+            eggGroup.transform.SetParent(row.transform, false);
+            SetPreferredSize(eggGroup, 240, 56);
+            var eggGroupLayout = eggGroup.AddComponent<HorizontalLayoutGroup>();
+            eggGroupLayout.spacing = 8;
+            eggGroupLayout.childAlignment = TextAnchor.MiddleCenter;
+            eggGroupLayout.childControlWidth = false;
+            eggGroupLayout.childControlHeight = false;
+            eggGroupLayout.childForceExpandWidth = false;
+            eggGroupLayout.childForceExpandHeight = false;
+
+            var eggImgObj = new GameObject("EggImage", typeof(RectTransform));
+            eggImgObj.transform.SetParent(eggGroup.transform, false);
+            SetPreferredSize(eggImgObj, 48, 48);
+            eggImage = eggImgObj.AddComponent<Image>();
+            eggImage.color = new Color(0.95f, 0.88f, 0.56f);
+
+            eggText = CreateText(eggGroup.transform, "鸡蛋: 全生");
+            eggText.fontSize = 20;
+            var eggTextRect = eggText.GetComponent<RectTransform>();
+            eggTextRect.sizeDelta = new Vector2(172, 32);
+        }
+
+        private static void CreateFireControlRow(Transform parent,
+            out Slider fireSlider, out Text fireLevelText)
+        {
+            var row = new GameObject("FireControl", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            SetPreferredSize(row, 760, 56);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 16;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            // 标签
+            var label = CreateText(row.transform, "火力");
+            label.fontSize = 22;
+            label.GetComponent<RectTransform>().sizeDelta = new Vector2(60, 32);
+
+            // 滑杆
+            var sliderObj = new GameObject("FireSlider", typeof(RectTransform));
+            sliderObj.transform.SetParent(row.transform, false);
+            SetPreferredSize(sliderObj, 300, 32);
+
+            // 滑杆背景
+            var sliderBg = sliderObj.AddComponent<Image>();
+            sliderBg.color = new Color(0.25f, 0.18f, 0.12f);
+
+            fireSlider = sliderObj.AddComponent<Slider>();
+            fireSlider.minValue = 0;
+            fireSlider.maxValue = 4;
+            fireSlider.wholeNumbers = true;
+            fireSlider.value = 0;
+            fireSlider.interactable = false;
+            fireSlider.direction = Slider.Direction.LeftToRight;
+
+            // 滑杆填充区域
+            var fillArea = new GameObject("Fill Area", typeof(RectTransform));
+            fillArea.transform.SetParent(sliderObj.transform, false);
+            var fillAreaRect = fillArea.GetComponent<RectTransform>();
+            fillAreaRect.anchorMin = new Vector2(0, 0.25f);
+            fillAreaRect.anchorMax = new Vector2(1, 0.75f);
+            fillAreaRect.offsetMin = Vector2.zero;
+            fillAreaRect.offsetMax = Vector2.zero;
+            var fill = new GameObject("Fill", typeof(RectTransform));
+            fill.transform.SetParent(fillArea.transform, false);
+            var fillRect = fill.GetComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            var fillImage = fill.AddComponent<Image>();
+            fillImage.color = new Color(0.95f, 0.42f, 0.18f);
+            fireSlider.fillRect = fillRect;
+            fireSlider.targetGraphic = fillImage;
+
+            // 滑杆手柄
+            var handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
+            handleArea.transform.SetParent(sliderObj.transform, false);
+            var handleAreaRect = handleArea.GetComponent<RectTransform>();
+            handleAreaRect.anchorMin = Vector2.zero;
+            handleAreaRect.anchorMax = Vector2.one;
+            handleAreaRect.offsetMin = Vector2.zero;
+            handleAreaRect.offsetMax = Vector2.zero;
+            var handle = new GameObject("Handle", typeof(RectTransform));
+            handle.transform.SetParent(handleArea.transform, false);
+            var handleRect = handle.GetComponent<RectTransform>();
+            handleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            handleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            handleRect.sizeDelta = new Vector2(24, 40);
+            var handleImage = handle.AddComponent<Image>();
+            handleImage.color = new Color(0.95f, 0.6f, 0.2f);
+            fireSlider.handleRect = handleRect;
+
+            // 火力档位文字
+            fireLevelText = CreateText(row.transform, "关火");
+            fireLevelText.fontSize = 22;
+            fireLevelText.color = new Color(0.95f, 0.42f, 0.18f);
+            fireLevelText.GetComponent<RectTransform>().sizeDelta = new Vector2(72, 32);
         }
 
         private static ReviewUI CreateReviewPanel(Transform parent)
         {
             var panel = CreatePanel<ReviewUI>(parent, "ReviewPanel");
             CreateTitle(panel.transform, "评价");
-            var text = CreateScrollableTextArea(panel.transform);
-            var button = CreateButton(panel.transform, "保存菜品");
+
+            // 翻页行
+            var navRow = new GameObject("NavRow", typeof(RectTransform));
+            navRow.transform.SetParent(panel.transform, false);
+            SetPreferredSize(navRow, 760, 40);
+            var navLayout = navRow.AddComponent<HorizontalLayoutGroup>();
+            navLayout.spacing = 20;
+            navLayout.childAlignment = TextAnchor.MiddleCenter;
+            navLayout.childControlWidth = false;
+            navLayout.childControlHeight = true;
+
+            var prevBtn = CreateButton(navRow.transform, "<", 80);
+            var pageText = CreateText(navRow.transform, "1/1");
+            pageText.fontSize = 20;
+            pageText.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 32);
+            var nextBtn = CreateButton(navRow.transform, ">", 80);
+
+            // 拆分字段
+            var npcName = CreateText(panel.transform, "评价者");
+            npcName.fontSize = 28;
+            npcName.alignment = TextAnchor.MiddleLeft;
+            SetPreferredSize(npcName.gameObject, 700, 40);
+
+            var score = CreateText(panel.transform, "评分：--");
+            score.fontSize = 36;
+            score.alignment = TextAnchor.MiddleCenter;
+
+            var summary = CreateText(panel.transform, "评价内容...");
+            summary.fontSize = 22;
+            summary.alignment = TextAnchor.MiddleLeft;
+            SetPreferredSize(summary.gameObject, 700, 120);
+
+            var suggestion = CreateText(panel.transform, "建议：--");
+            suggestion.fontSize = 20;
+            suggestion.alignment = TextAnchor.MiddleLeft;
+            SetPreferredSize(suggestion.gameObject, 700, 60);
+
+            var reputation = CreateText(panel.transform, "声望 ±0");
+            reputation.fontSize = 22;
+            reputation.alignment = TextAnchor.MiddleCenter;
+
+            var button = CreateButton(panel.transform, "返回食单");
             var buttonText = button.GetComponentInChildren<Text>();
-            Assign(panel, "reviewText", text);
+
+            Assign(panel, "npcNameText", npcName);
+            Assign(panel, "scoreText", score);
+            Assign(panel, "summaryText", summary);
+            Assign(panel, "suggestionText", suggestion);
+            Assign(panel, "reputationText", reputation);
+            Assign(panel, "prevButton", prevBtn);
+            Assign(panel, "nextButton", nextBtn);
+            Assign(panel, "pageIndicator", pageText);
             Assign(panel, "continueButtonText", buttonText);
+            UnityEventTools.AddPersistentListener(prevBtn.onClick, panel.PrevReview);
+            UnityEventTools.AddPersistentListener(nextBtn.onClick, panel.NextReview);
             UnityEventTools.AddPersistentListener(button.onClick, panel.Continue);
             return panel;
         }
