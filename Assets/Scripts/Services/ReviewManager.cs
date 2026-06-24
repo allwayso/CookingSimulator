@@ -19,6 +19,9 @@ namespace CookingSimulator.Services
             var completed = new HashSet<string>();
             foreach (var record in log.records)
             {
+                // Timed-out actions are logged with "missed_" prefix — skip them
+                if (record.action.StartsWith("missed_"))
+                    continue;
                 completed.Add(record.action);
             }
 

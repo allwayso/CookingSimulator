@@ -4,6 +4,7 @@
   "description": "先炒鸡蛋盛出，再炒番茄出沙，最后混合调味出锅。",
   "ingredients": ["番茄", "鸡蛋"],
   "seasonings": ["盐"],
+  "timedPopupDelays": [5, 10, 16, 22],
   "steps": [
     { "order": 1, "action": "cut",               "target": "番茄",  "hint": "先把番茄切好。" },
     { "order": 2, "action": "put_in_pan",        "target": "鸡蛋",  "hint": "选择鸡蛋后点击下锅，开始炒鸡蛋。" },
