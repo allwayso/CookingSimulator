@@ -27,6 +27,11 @@ namespace CookingSimulator.Core
         [SerializeField] private StatusBarUI statusBarUI;
         [SerializeField] private GameObject loginBackgroundRoot;
 
+        [Header("Free Roam")]
+        [SerializeField] private 交互管理 interactionManager;
+        [SerializeField] private 备菜选菜UI ingredientSelectUI;
+        [SerializeField] private GameObject playerObject;
+
         private UserData currentUser;
         private RecipeData currentRecipe;
         private CookingLog currentLog;
@@ -34,6 +39,9 @@ namespace CookingSimulator.Core
         private DishState currentState;
         private string currentDishId;
         private string currentLogPath;
+
+        private bool ingredientsReady;
+        private RecipeData selectedRecipe;
 
         private void Start()
         {
@@ -51,19 +59,83 @@ namespace CookingSimulator.Core
 
         public void EnterChefMode()
         {
-            var recipes = recipeManager.LoadRecipes();
-            recipeSelectUI.Show(recipes, StartCooking, ShowMenuFromRecipeSelect);
+            ingredientsReady = false;
+            selectedRecipe = null;
+            EnterFreeRoam();
+        }
+
+        // ── Free Roam（餐厅自由走动）──────────────────────────
+
+        private void EnterFreeRoam()
+        {
+            Hide(loginUI);
             Hide(modeSelectUI);
+            Hide(recipeSelectUI);
+            Hide(cookingUI);
+            Hide(reviewUI);
+            Hide(saveDishUI);
+            Hide(menuUI);
+            statusBarUI?.Show(currentUser);
+            SetLoginBackgroundVisible(true);
+
+            if (interactionManager != null)
+            {
+                interactionManager.gameObject.SetActive(true);
+                interactionManager.OnInteract -= HandleInteraction;
+                interactionManager.OnInteract += HandleInteraction;
+            }
+        }
+
+        private void HandleInteraction(InteractionType type)
+        {
+            switch (type)
+            {
+                case InteractionType.Fridge:
+                    OpenIngredientSelect();
+                    break;
+                case InteractionType.Stove:
+                    if (ingredientsReady && selectedRecipe != null)
+                        StartCookingWithRecipe(selectedRecipe);
+                    break;
+            }
+        }
+
+        private void OpenIngredientSelect()
+        {
+            if (interactionManager != null)
+                interactionManager.gameObject.SetActive(false);
+
+            var recipes = recipeManager.LoadRecipes();
+            var allIngredients = GatherAllIngredients(recipes);
+
+            ingredientSelectUI.Show(allIngredients, recipes, OnIngredientsConfirmed, OnIngredientCancelled);
             SetLoginBackgroundVisible(false);
         }
 
-        public void StartCooking(RecipeData recipe)
+        private void OnIngredientsConfirmed(RecipeData recipe)
         {
+            selectedRecipe = recipe;
+            ingredientsReady = true;
+            StartCoroutine(DelayedExitIngredientSelect());
+        }
+
+        private void OnIngredientCancelled()
+        {
+            ingredientSelectUI.Hide();
+            EnterFreeRoam();
+        }
+
+        private void StartCookingWithRecipe(RecipeData recipe)
+        {
+            if (interactionManager != null)
+                interactionManager.gameObject.SetActive(false);
+
             currentRecipe = recipe;
             currentDishId = Guid.NewGuid().ToString("N");
             currentState = DishState.Raw;
             logManager.StartLog(currentUser, currentRecipe, currentDishId);
             cookingUI.Show(currentRecipe, currentState, HandleCookingAction, FinishCooking);
+            SetLoginBackgroundVisible(false);
             Hide(recipeSelectUI);
         }
 
@@ -219,6 +291,35 @@ namespace CookingSimulator.Core
                 reviewUI.Show(review, ShowMenu, "返回食单");
                 Hide(menuUI);
             }));
+        }
+
+        // ── Free Roam helpers ──────────────────────────────
+
+        private static string[] GatherAllIngredients(List<RecipeData> recipes)
+        {
+            var set = new System.Collections.Generic.HashSet<string>();
+            if (recipes != null)
+            {
+                foreach (var r in recipes)
+                {
+                    if (r.ingredients != null)
+                    {
+                        foreach (var ing in r.ingredients)
+                            set.Add(ing);
+                    }
+                }
+            }
+            var result = new string[set.Count];
+            set.CopyTo(result);
+            return result;
+        }
+
+        private System.Collections.IEnumerator DelayedExitIngredientSelect()
+        {
+            // ingredient panel already shows "备菜完成" from Confirm()
+            yield return new WaitForSeconds(1.5f);
+            ingredientSelectUI.Hide();
+            EnterFreeRoam();
         }
 
         private void ShowLogin()

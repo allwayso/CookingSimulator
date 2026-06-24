@@ -23,8 +23,10 @@ namespace CookingSimulator.Editor
             var loginBackground = CreateLoginBackground();
             var character = CreateCharacter();
             var fridge = CreateFridge(character != null ? character.transform : null);
+            var stove = CreateStove(character != null ? character.transform : null);
             CreateCamera();
             var canvas = CreateCanvas();
+            var interactionPrompt = CreateInteractionPrompt(canvas);
             var eventSystem = new GameObject("EventSystem");
             eventSystem.AddComponent<UnityEngine.EventSystems.EventSystem>();
             eventSystem.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
@@ -44,6 +46,23 @@ namespace CookingSimulator.Editor
             var saveDish = CreateSaveDishPanel(canvas.transform);
             var menu = CreateMenuPanel(canvas.transform);
             var statusBar = CreateStatusBar(canvas.transform);
+            var ingredientSelect = CreateIngredientSelectPanel(canvas.transform);
+            ingredientSelect.gameObject.SetActive(false);
+
+            // 交互管理器（默认关闭，FreeRoam 时激活）
+            var interactionManagerObj = new GameObject("InteractionManager");
+            interactionManagerObj.SetActive(false);
+            var interactionManager = interactionManagerObj.AddComponent<交互管理>();
+            Assign(interactionManager, "player", character != null ? character.transform : null);
+            Assign(interactionManager, "interactionPrompt", interactionPrompt);
+
+            // 设置 promptText（从 InteractionPrompt 子对象中获取）
+            var promptTextTransform = interactionPrompt.transform.Find("PromptText");
+            if (promptTextTransform != null)
+            {
+                var promptText = promptTextTransform.GetComponent<Text>();
+                Assign(interactionManager, "promptText", promptText);
+            }
 
             var managerObject = new GameObject("GameManager");
             var gameManager = managerObject.AddComponent<GameManager>();
@@ -61,6 +80,9 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "menuUI", menu);
             Assign(gameManager, "statusBarUI", statusBar);
             Assign(gameManager, "loginBackgroundRoot", loginBackground);
+            Assign(gameManager, "interactionManager", interactionManager);
+            Assign(gameManager, "ingredientSelectUI", ingredientSelect);
+            Assign(gameManager, "playerObject", character);
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
@@ -200,7 +222,119 @@ namespace CookingSimulator.Editor
             framesProp.GetArrayElementAtIndex(4).objectReferenceValue = frame4;
             animSO.ApplyModifiedPropertiesWithoutUndo();
 
+            // 添加交互物组件（与冰箱动画共用相同的 triggerDistance 和 bodyOffset）
+            var interactable = fridge.AddComponent<交互物>();
+            var intSO = new SerializedObject(interactable);
+            intSO.FindProperty("triggerDistance").floatValue = 4f;
+            intSO.FindProperty("bodyOffset").vector3Value = new Vector3(-0.175f, 0f, 0f);
+            intSO.FindProperty("promptMessage").stringValue = "按F选菜";
+            intSO.FindProperty("interactionType").enumValueIndex = (int)InteractionType.Fridge;
+            intSO.ApplyModifiedPropertiesWithoutUndo();
+
             return fridge;
+        }
+
+        private static GameObject CreateStove(Transform playerTransform)
+        {
+            var stove = new GameObject("灶台");
+            stove.transform.position = new Vector3(7f, 2.76f, 0f);
+            stove.transform.localScale = new Vector3(5.0f, 5.0f, 1f);
+
+            var stoveSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
+                "Assets/kitchen/StoveCutouts/灶台2.png");
+
+            var sr = stove.AddComponent<SpriteRenderer>();
+            sr.sprite = stoveSprite;
+
+            // 灶台动画（静态精灵）
+            var anim = stove.AddComponent<灶台动画>();
+            var animSO = new SerializedObject(anim);
+            animSO.FindProperty("stoveSprite").objectReferenceValue = stoveSprite;
+            animSO.ApplyModifiedPropertiesWithoutUndo();
+
+            // 交互物组件
+            var interactable = stove.AddComponent<交互物>();
+            var intSO = new SerializedObject(interactable);
+            intSO.FindProperty("triggerDistance").floatValue = 0.2f;
+            intSO.FindProperty("bodyOffset").vector3Value = Vector3.zero;
+            intSO.FindProperty("promptMessage").stringValue = "按F做菜";
+            intSO.FindProperty("interactionType").enumValueIndex = (int)InteractionType.Stove;
+            intSO.ApplyModifiedPropertiesWithoutUndo();
+
+            return stove;
+        }
+
+        private static GameObject CreateInteractionPrompt(Canvas canvas)
+        {
+            var prompt = new GameObject("InteractionPrompt", typeof(RectTransform));
+            prompt.transform.SetParent(canvas.transform, false);
+
+            var rect = prompt.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(200, 50);
+
+            var image = prompt.AddComponent<Image>();
+            image.color = new Color(0.08f, 0.07f, 0.06f, 0.85f);
+
+            var outline = prompt.AddComponent<Outline>();
+            outline.effectColor = new Color(0.94f, 0.76f, 0.38f, 1f);
+            outline.effectDistance = new Vector2(2, -2);
+
+            var ignoreLayout = prompt.AddComponent<LayoutElement>();
+            ignoreLayout.ignoreLayout = true;
+
+            var textObj = new GameObject("PromptText", typeof(RectTransform));
+            textObj.transform.SetParent(prompt.transform, false);
+            var label = textObj.AddComponent<Text>();
+            label.text = string.Empty;
+            label.fontSize = 20;
+            label.color = Color.white;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            StretchChild(textObj, 4, 4, -4, -4);
+
+            prompt.SetActive(false);
+            return prompt;
+        }
+
+        private static 备菜选菜UI CreateIngredientSelectPanel(Transform parent)
+        {
+            var panel = CreatePanel<备菜选菜UI>(parent, "IngredientSelectPanel");
+
+            var title = CreateTitle(panel.transform, "备菜选菜");
+
+            var ingredientRoot = new GameObject("IngredientButtonColumn", typeof(RectTransform));
+            ingredientRoot.transform.SetParent(panel.transform, false);
+            SetPreferredSize(ingredientRoot, 760, 200);
+            var layout = ingredientRoot.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 10;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+
+            var template = CreateButton(ingredientRoot.transform, "食材");
+            template.gameObject.SetActive(false);
+
+            var selectedText = CreateText(panel.transform, "已选：无");
+            selectedText.fontSize = 22;
+
+            var messageText = CreateText(panel.transform, string.Empty);
+            messageText.fontSize = 18;
+
+            var confirmButton = CreateButton(panel.transform, "确认备菜", 200);
+            var cancelButton = CreateButton(panel.transform, "返回", 200);
+
+            Assign(panel, "titleText", title);
+            Assign(panel, "ingredientButtonRoot", ingredientRoot.transform);
+            Assign(panel, "ingredientButtonTemplate", template);
+            Assign(panel, "selectedDisplayText", selectedText);
+            Assign(panel, "messageText", messageText);
+            Assign(panel, "confirmButton", confirmButton);
+            Assign(panel, "cancelButton", cancelButton);
+
+            UnityEventTools.AddPersistentListener(confirmButton.onClick, panel.Confirm);
+            UnityEventTools.AddPersistentListener(cancelButton.onClick, panel.Cancel);
+
+            return panel;
         }
 
         private static LoginUI CreateLoginPanel(Transform parent)
