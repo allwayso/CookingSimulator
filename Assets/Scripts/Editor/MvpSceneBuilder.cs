@@ -17,9 +17,6 @@ namespace CookingSimulator.Editor
         [MenuItem("Cooking Simulator/Build MVP Scene")]
         public static void BuildScene()
         {
-            // 如果 prefab 尚未升级（缺少新 UI 元素），先自动升级
-            UpgradeCookingPanelPrefab();
-
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "MVP";
 
