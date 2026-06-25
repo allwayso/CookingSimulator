@@ -525,11 +525,13 @@ namespace CookingSimulator.Editor
             if (prefab == null)
                 throw new InvalidOperationException($"Missing prefab: {prefabPath}");
 
-            var instance = PrefabUtility.InstantiatePrefab(prefab, parent) as GameObject;
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
             if (instance == null)
                 throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
 
+            instance.transform.SetParent(parent, false);
             instance.name = "CookingPanel";
+            Debug.Log("Build MVP Scene: CookingPanel instantiated directly from prefab without auto-upgrade.");
             return instance.GetComponent<CookingUI>();
         }
 
