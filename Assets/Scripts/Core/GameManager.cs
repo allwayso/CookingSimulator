@@ -57,6 +57,18 @@ namespace CookingSimulator.Core
             ShowLogin();
         }
 
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
+            }
+        }
+
         public void Login(string username)
         {
             currentUser = saveManager.LoadOrCreateUser(username);
@@ -306,7 +318,7 @@ namespace CookingSimulator.Core
             saveManager.SaveReview(currentReview);
 
             // 直接进入保存界面（AI评价在保存时并行请求）
-            saveDishUI.Show(currentReview, SaveDish);
+            saveDishUI.Show(currentReview, SaveDish, DiscardDish);
             Hide(cookingUI);
         }
 
@@ -336,6 +348,12 @@ namespace CookingSimulator.Core
             }
 
             // 立即回到菜单
+            ShowMenu();
+        }
+
+        public void DiscardDish()
+        {
+            Hide(saveDishUI);
             ShowMenu();
         }
 
