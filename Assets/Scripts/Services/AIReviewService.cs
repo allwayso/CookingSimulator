@@ -100,46 +100,6 @@ namespace CookingSimulator.Services
             onAllComplete(results);
         }
 
-        // ── 向下兼容：保留老八快捷方法 ──
-
-        public IEnumerator CreateLaobaReview(
-            DishData dish, RecipeData recipe, CookingLog log,
-            ReviewData baseReview, Action<ReviewData, bool, string> onComplete)
-        {
-            var npc = new NPCData { id = "laoba", name = "老八", personaFile = "ai_laoba.md" };
-            yield return CreateReview(dish, recipe, log, baseReview, npc, (review, usedAi) =>
-            {
-                onComplete(review, usedAi, usedAi ? string.Empty : "AI unavailable");
-            });
-        }
-
-        // ── 测试连接 ──
-
-        public IEnumerator TestConnection(Action<bool, string> onComplete)
-        {
-            if (!TryLoadProviders(out var providers, out var configError))
-            {
-                onComplete(false, configError);
-                yield break;
-            }
-
-            var responseText = string.Empty;
-            var requestError = string.Empty;
-            yield return RunProviderRequests(providers, "只回复 OK。", (response, error) =>
-            {
-                responseText = response;
-                requestError = error;
-            });
-
-            if (!string.IsNullOrWhiteSpace(requestError))
-            {
-                onComplete(false, requestError);
-                yield break;
-            }
-
-            onComplete(!string.IsNullOrWhiteSpace(responseText), "AI test response received.");
-        }
-
         public static bool TestConnectionNow(out string message)
         {
             if (!TryLoadProviders(out var providers, out var configError))

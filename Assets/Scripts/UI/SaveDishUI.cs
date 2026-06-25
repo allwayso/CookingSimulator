@@ -12,14 +12,21 @@ namespace CookingSimulator.UI
         [SerializeField] private Text messageText;
 
         private Action<string, float> onSave;
+        private Action onDiscard;
 
-        public void Show(ReviewData review, Action<string, float> saveAction)
+        public void Show(ReviewData review, Action<string, float> saveAction, Action discardAction = null)
         {
             onSave = saveAction;
+            onDiscard = discardAction;
             gameObject.SetActive(true);
             dishNameInput.text = "我的番茄炒蛋";
             priceInput.text = "18";
             messageText.text = string.Empty;
+        }
+
+        public void Discard()
+        {
+            onDiscard?.Invoke();
         }
 
         public void Submit()

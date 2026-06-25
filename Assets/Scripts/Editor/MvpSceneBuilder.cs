@@ -17,9 +17,6 @@ namespace CookingSimulator.Editor
         [MenuItem("Cooking Simulator/Build MVP Scene")]
         public static void BuildScene()
         {
-            // 如果 prefab 尚未升级（缺少新 UI 元素），先自动升级
-            UpgradeCookingPanelPrefab();
-
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "MVP";
 
@@ -528,11 +525,13 @@ namespace CookingSimulator.Editor
             if (prefab == null)
                 throw new InvalidOperationException($"Missing prefab: {prefabPath}");
 
-            var instance = PrefabUtility.InstantiatePrefab(prefab, parent) as GameObject;
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
             if (instance == null)
                 throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
 
+            instance.transform.SetParent(parent, false);
             instance.name = "CookingPanel";
+            Debug.Log("Build MVP Scene: CookingPanel instantiated directly from prefab without auto-upgrade.");
             return instance.GetComponent<CookingUI>();
         }
 
@@ -932,204 +931,53 @@ namespace CookingSimulator.Editor
 
         private static ReviewUI CreateReviewPanel(Transform parent)
         {
-            var panel = CreatePanel<ReviewUI>(parent, "ReviewPanel");
-            CreateTitle(panel.transform, "评价");
+            const string prefabPath = "Assets/prefab/UI/ReviewPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
 
-            // 翻页行
-            var navRow = new GameObject("NavRow", typeof(RectTransform));
-            navRow.transform.SetParent(panel.transform, false);
-            SetPreferredSize(navRow, 760, 40);
-            var navLayout = navRow.AddComponent<HorizontalLayoutGroup>();
-            navLayout.spacing = 20;
-            navLayout.childAlignment = TextAnchor.MiddleCenter;
-            navLayout.childControlWidth = false;
-            navLayout.childControlHeight = true;
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
 
-            var prevBtn = CreateButton(navRow.transform, "<", 80);
-            var pageText = CreateText(navRow.transform, "1/1");
-            pageText.fontSize = 20;
-            pageText.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 32);
-            var nextBtn = CreateButton(navRow.transform, ">", 80);
-
-            // 拆分字段
-            var npcName = CreateText(panel.transform, "评价者");
-            npcName.fontSize = 28;
-            npcName.alignment = TextAnchor.MiddleLeft;
-            SetPreferredSize(npcName.gameObject, 700, 40);
-
-            var score = CreateText(panel.transform, "评分：--");
-            score.fontSize = 36;
-            score.alignment = TextAnchor.MiddleCenter;
-
-            var summary = CreateText(panel.transform, "评价内容...");
-            summary.fontSize = 22;
-            summary.alignment = TextAnchor.MiddleLeft;
-            SetPreferredSize(summary.gameObject, 700, 120);
-
-            var suggestion = CreateText(panel.transform, "建议：--");
-            suggestion.fontSize = 20;
-            suggestion.alignment = TextAnchor.MiddleLeft;
-            SetPreferredSize(suggestion.gameObject, 700, 60);
-
-            var reputation = CreateText(panel.transform, "声望 ±0");
-            reputation.fontSize = 22;
-            reputation.alignment = TextAnchor.MiddleCenter;
-
-            var button = CreateButton(panel.transform, "返回食单");
-            var buttonText = button.GetComponentInChildren<Text>();
-
-            Assign(panel, "npcNameText", npcName);
-            Assign(panel, "scoreText", score);
-            Assign(panel, "summaryText", summary);
-            Assign(panel, "suggestionText", suggestion);
-            Assign(panel, "reputationText", reputation);
-            Assign(panel, "prevButton", prevBtn);
-            Assign(panel, "nextButton", nextBtn);
-            Assign(panel, "pageIndicator", pageText);
-            Assign(panel, "continueButtonText", buttonText);
-            UnityEventTools.AddPersistentListener(prevBtn.onClick, panel.PrevReview);
-            UnityEventTools.AddPersistentListener(nextBtn.onClick, panel.NextReview);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.Continue);
-            return panel;
+            instance.transform.SetParent(parent, false);
+            instance.name = "ReviewPanel";
+            Debug.Log("Build MVP Scene: ReviewPanel instantiated directly from prefab.");
+            return instance.GetComponent<ReviewUI>();
         }
 
         private static SaveDishUI CreateSaveDishPanel(Transform parent)
         {
-            var panel = CreatePanel<SaveDishUI>(parent, "SaveDishPanel");
-            CreateTitle(panel.transform, "保存菜品");
-            var nameInput = CreateInput(panel.transform, "菜名");
-            var priceInput = CreateInput(panel.transform, "价格");
-            var message = CreateText(panel.transform, string.Empty);
-            var button = CreateButton(panel.transform, "保存到食单");
-            Assign(panel, "dishNameInput", nameInput);
-            Assign(panel, "priceInput", priceInput);
-            Assign(panel, "messageText", message);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.Submit);
-            return panel;
+            const string prefabPath = "Assets/prefab/UI/SaveDishPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
+
+            instance.transform.SetParent(parent, false);
+            instance.name = "SaveDishPanel";
+            Debug.Log("Build MVP Scene: SaveDishPanel instantiated directly from prefab.");
+            return instance.GetComponent<SaveDishUI>();
         }
 
         private static MenuUI CreateMenuPanel(Transform parent)
         {
-            var panel = CreatePanel<MenuUI>(parent, "MenuPanel");
-            var text = CreateTitle(panel.transform, "我的食单");
-            var dishRoot = CreateButtonColumn(panel.transform);
-            var dishButtonTemplate = CreateButton(dishRoot.transform, "菜品");
-            dishButtonTemplate.gameObject.SetActive(false);
-            var backButton = CreateButton(panel.transform, "返回食单");
-            backButton.gameObject.SetActive(false);
-            var button = CreateButton(panel.transform, "再做一道");
-            Assign(panel, "dishesText", text);
-            Assign(panel, "dishesButtonRoot", dishRoot.transform);
-            Assign(panel, "dishButtonTemplate", dishButtonTemplate);
-            Assign(panel, "backButton", backButton);
-            UnityEventTools.AddPersistentListener(backButton.onClick, panel.BackToDishes);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.CookAgain);
-            return panel;
-        }
+            const string prefabPath = "Assets/prefab/UI/MenuPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
 
-        private static GameObject CreateButtonColumn(Transform parent)
-        {
-            var column = new GameObject("DishButtonColumn", typeof(RectTransform));
-            column.transform.SetParent(parent, false);
-            SetPreferredSize(column, 760, 260);
-            var layout = column.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 10;
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.childControlWidth = false;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-            return column;
-        }
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
 
-        private static Text CreateScrollableTextArea(Transform parent)
-        {
-            var scrollObject = new GameObject("ReviewScrollView", typeof(RectTransform));
-            scrollObject.transform.SetParent(parent, false);
-            SetPreferredSize(scrollObject, 760, 320);
-            var scrollImage = scrollObject.AddComponent<Image>();
-            scrollImage.color = new Color(1f, 1f, 1f, 0.06f);
-            var scrollRect = scrollObject.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-
-            var viewport = new GameObject("Viewport", typeof(RectTransform));
-            viewport.transform.SetParent(scrollObject.transform, false);
-            var viewportRect = viewport.GetComponent<RectTransform>();
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = new Vector2(12, 12);
-            viewportRect.offsetMax = new Vector2(-24, -12);
-            var viewportImage = viewport.AddComponent<Image>();
-            viewportImage.color = new Color(1f, 1f, 1f, 0.02f);
-            viewport.AddComponent<Mask>().showMaskGraphic = false;
-
-            var content = new GameObject("Content", typeof(RectTransform));
-            content.transform.SetParent(viewport.transform, false);
-            var contentRect = content.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0, 1);
-            contentRect.anchorMax = new Vector2(1, 1);
-            contentRect.pivot = new Vector2(0.5f, 1);
-            contentRect.sizeDelta = new Vector2(0, 320);
-            var contentFitter = content.AddComponent<ContentSizeFitter>();
-            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var text = CreateText(content.transform, string.Empty);
-            text.alignment = TextAnchor.UpperLeft;
-            text.fontSize = 22;
-            var textRect = text.GetComponent<RectTransform>();
-            textRect.anchorMin = new Vector2(0, 1);
-            textRect.anchorMax = new Vector2(1, 1);
-            textRect.pivot = new Vector2(0.5f, 1);
-            textRect.sizeDelta = new Vector2(0, 320);
-            var textLayout = text.gameObject.GetComponent<LayoutElement>();
-            textLayout.preferredHeight = 320;
-            textLayout.minHeight = 320;
-
-            var scrollbar = CreateVerticalScrollbar(scrollObject.transform);
-            scrollRect.viewport = viewportRect;
-            scrollRect.content = contentRect;
-            scrollRect.verticalScrollbar = scrollbar;
-            scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
-            return text;
-        }
-
-        private static Scrollbar CreateVerticalScrollbar(Transform parent)
-        {
-            var scrollbarObject = new GameObject("Scrollbar", typeof(RectTransform));
-            scrollbarObject.transform.SetParent(parent, false);
-            var rect = scrollbarObject.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(1, 0);
-            rect.anchorMax = new Vector2(1, 1);
-            rect.pivot = new Vector2(1, 1);
-            rect.sizeDelta = new Vector2(16, 0);
-            rect.offsetMin = new Vector2(-16, 0);
-            rect.offsetMax = Vector2.zero;
-
-            var background = scrollbarObject.AddComponent<Image>();
-            background.color = new Color(1f, 1f, 1f, 0.08f);
-            var scrollbar = scrollbarObject.AddComponent<Scrollbar>();
-            scrollbar.direction = Scrollbar.Direction.BottomToTop;
-
-            var slidingArea = new GameObject("Sliding Area", typeof(RectTransform));
-            slidingArea.transform.SetParent(scrollbarObject.transform, false);
-            var slidingRect = slidingArea.GetComponent<RectTransform>();
-            slidingRect.anchorMin = Vector2.zero;
-            slidingRect.anchorMax = Vector2.one;
-            slidingRect.offsetMin = new Vector2(2, 2);
-            slidingRect.offsetMax = new Vector2(-2, -2);
-
-            var handle = new GameObject("Handle", typeof(RectTransform));
-            handle.transform.SetParent(slidingArea.transform, false);
-            var handleRect = handle.GetComponent<RectTransform>();
-            handleRect.anchorMin = Vector2.zero;
-            handleRect.anchorMax = Vector2.one;
-            handleRect.offsetMin = Vector2.zero;
-            handleRect.offsetMax = Vector2.zero;
-            var handleImage = handle.AddComponent<Image>();
-            handleImage.color = new Color(0.35f, 0.66f, 0.9f, 0.95f);
-            scrollbar.targetGraphic = handleImage;
-            scrollbar.handleRect = handleRect;
-            return scrollbar;
+            instance.transform.SetParent(parent, false);
+            instance.name = "MenuPanel";
+            Debug.Log("Build MVP Scene: MenuPanel instantiated directly from prefab.");
+            return instance.GetComponent<MenuUI>();
         }
 
         private static T CreatePanel<T>(Transform parent, string name) where T : MonoBehaviour
@@ -1147,34 +995,6 @@ namespace CookingSimulator.Editor
             layout.padding = new RectOffset(32, 32, 32, 32);
             layout.spacing = 16;
             layout.childAlignment = TextAnchor.UpperCenter;
-            return panel.AddComponent<T>();
-        }
-
-        private static T CreatePixelPanel<T>(Transform parent, string name, float width, float height) where T : MonoBehaviour
-        {
-            var panel = new GameObject(name);
-            panel.transform.SetParent(parent, false);
-            var rect = panel.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(width, height);
-
-            var image = panel.AddComponent<Image>();
-            image.color = new Color(0.08f, 0.07f, 0.06f, 0.86f);
-            var outline = panel.AddComponent<Outline>();
-            outline.effectColor = new Color(0.94f, 0.76f, 0.38f, 1f);
-            outline.effectDistance = new Vector2(4, -4);
-
-            var layout = panel.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(28, 28, 28, 28);
-            layout.spacing = 14;
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.childControlWidth = false;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
             return panel.AddComponent<T>();
         }
 
@@ -1198,30 +1018,6 @@ namespace CookingSimulator.Editor
             label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             SetPreferredSize(obj, 760, 44);
             return label;
-        }
-
-        private static InputField CreateInput(Transform parent, string placeholder)
-        {
-            var obj = new GameObject(placeholder + "Input", typeof(RectTransform));
-            obj.transform.SetParent(parent, false);
-            SetPreferredSize(obj, 420, 48);
-            var image = obj.AddComponent<Image>();
-            image.color = new Color(0.96f, 0.9f, 0.72f);
-            var outline = obj.AddComponent<Outline>();
-            outline.effectColor = new Color(0.18f, 0.12f, 0.08f);
-            outline.effectDistance = new Vector2(3, -3);
-            var input = obj.AddComponent<InputField>();
-            var text = CreateText(obj.transform, string.Empty);
-            text.color = new Color(0.12f, 0.08f, 0.05f);
-            text.alignment = TextAnchor.MiddleLeft;
-            StretchChild(text.gameObject, 14, 8, -14, -8);
-            var hint = CreateText(obj.transform, placeholder);
-            hint.color = new Color(0.45f, 0.34f, 0.24f);
-            hint.alignment = TextAnchor.MiddleLeft;
-            StretchChild(hint.gameObject, 14, 8, -14, -8);
-            input.textComponent = text;
-            input.placeholder = hint;
-            return input;
         }
 
         private static Button CreateButton(Transform parent, string text)
@@ -1250,43 +1046,6 @@ namespace CookingSimulator.Editor
             label.fontSize = 24;
             label.color = new Color(1f, 0.94f, 0.72f);
             StretchChild(label.gameObject, 0, 0, 0, 0);
-            return button;
-        }
-
-        private static Button CreatePrefabButton(Transform parent, string prefabPath, string text)
-        {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-            if (prefab == null)
-            {
-                return CreateButton(parent, text);
-            }
-
-            var obj = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-            if (obj == null)
-            {
-                return CreateButton(parent, text);
-            }
-
-            obj.transform.SetParent(parent, false);
-            obj.name = text + "Button";
-
-            var button = obj.GetComponent<Button>() ?? obj.AddComponent<Button>();
-            button.onClick.RemoveAllListeners();
-            for (var index = button.onClick.GetPersistentEventCount() - 1; index >= 0; index--)
-            {
-                UnityEventTools.RemovePersistentListener(button.onClick, index);
-            }
-
-            var label = obj.GetComponentInChildren<Text>();
-            if (label != null)
-            {
-                label.text = text;
-            }
-
-            var layout = obj.GetComponent<LayoutElement>() ?? obj.AddComponent<LayoutElement>();
-            layout.preferredWidth = 260;
-            layout.preferredHeight = 48;
-            layout.minHeight = 48;
             return button;
         }
 

@@ -89,26 +89,6 @@ namespace CookingSimulator.Services
             return File.Exists(path) ? JsonUtility.FromJson<ReviewData>(File.ReadAllText(path)) : null;
         }
 
-        public ReviewData LoadReviewByDishAndReviewer(string dishId, string reviewerId)
-        {
-            EnsureDirectories();
-            if (string.IsNullOrWhiteSpace(dishId) || string.IsNullOrWhiteSpace(reviewerId))
-            {
-                return null;
-            }
-
-            foreach (var path in Directory.GetFiles(ReviewsPath, "*.json"))
-            {
-                var review = JsonUtility.FromJson<ReviewData>(File.ReadAllText(path));
-                if (review.dishId == dishId && review.reviewerId == reviewerId)
-                {
-                    return review;
-                }
-            }
-
-            return null;
-        }
-
         public string SaveDish(DishData dish)
         {
             EnsureDirectories();
