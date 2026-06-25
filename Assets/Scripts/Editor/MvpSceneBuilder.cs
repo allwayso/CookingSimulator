@@ -931,99 +931,53 @@ namespace CookingSimulator.Editor
 
         private static ReviewUI CreateReviewPanel(Transform parent)
         {
-            var panel = CreatePanel<ReviewUI>(parent, "ReviewPanel");
-            CreateTitle(panel.transform, "评价");
+            const string prefabPath = "Assets/prefab/UI/ReviewPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
 
-            // 翻页行
-            var navRow = new GameObject("NavRow", typeof(RectTransform));
-            navRow.transform.SetParent(panel.transform, false);
-            SetPreferredSize(navRow, 760, 40);
-            var navLayout = navRow.AddComponent<HorizontalLayoutGroup>();
-            navLayout.spacing = 20;
-            navLayout.childAlignment = TextAnchor.MiddleCenter;
-            navLayout.childControlWidth = false;
-            navLayout.childControlHeight = true;
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
 
-            var prevBtn = CreateButton(navRow.transform, "<", 80);
-            var pageText = CreateText(navRow.transform, "1/1");
-            pageText.fontSize = 20;
-            pageText.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 32);
-            var nextBtn = CreateButton(navRow.transform, ">", 80);
-
-            // 拆分字段
-            var npcName = CreateText(panel.transform, "评价者");
-            npcName.fontSize = 28;
-            npcName.alignment = TextAnchor.MiddleLeft;
-            SetPreferredSize(npcName.gameObject, 700, 40);
-
-            var score = CreateText(panel.transform, "评分：--");
-            score.fontSize = 36;
-            score.alignment = TextAnchor.MiddleCenter;
-
-            var summary = CreateText(panel.transform, "评价内容...");
-            summary.fontSize = 22;
-            summary.alignment = TextAnchor.MiddleLeft;
-            SetPreferredSize(summary.gameObject, 700, 120);
-
-            var suggestion = CreateText(panel.transform, "建议：--");
-            suggestion.fontSize = 20;
-            suggestion.alignment = TextAnchor.MiddleLeft;
-            SetPreferredSize(suggestion.gameObject, 700, 60);
-
-            var reputation = CreateText(panel.transform, "声望 ±0");
-            reputation.fontSize = 22;
-            reputation.alignment = TextAnchor.MiddleCenter;
-
-            var button = CreateButton(panel.transform, "返回食单");
-            var buttonText = button.GetComponentInChildren<Text>();
-
-            Assign(panel, "npcNameText", npcName);
-            Assign(panel, "scoreText", score);
-            Assign(panel, "summaryText", summary);
-            Assign(panel, "suggestionText", suggestion);
-            Assign(panel, "reputationText", reputation);
-            Assign(panel, "prevButton", prevBtn);
-            Assign(panel, "nextButton", nextBtn);
-            Assign(panel, "pageIndicator", pageText);
-            Assign(panel, "continueButtonText", buttonText);
-            UnityEventTools.AddPersistentListener(prevBtn.onClick, panel.PrevReview);
-            UnityEventTools.AddPersistentListener(nextBtn.onClick, panel.NextReview);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.Continue);
-            return panel;
+            instance.transform.SetParent(parent, false);
+            instance.name = "ReviewPanel";
+            Debug.Log("Build MVP Scene: ReviewPanel instantiated directly from prefab.");
+            return instance.GetComponent<ReviewUI>();
         }
 
         private static SaveDishUI CreateSaveDishPanel(Transform parent)
         {
-            var panel = CreatePanel<SaveDishUI>(parent, "SaveDishPanel");
-            CreateTitle(panel.transform, "保存菜品");
-            var nameInput = CreateInput(panel.transform, "菜名");
-            var priceInput = CreateInput(panel.transform, "价格");
-            var message = CreateText(panel.transform, string.Empty);
-            var button = CreateButton(panel.transform, "保存到食单");
-            Assign(panel, "dishNameInput", nameInput);
-            Assign(panel, "priceInput", priceInput);
-            Assign(panel, "messageText", message);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.Submit);
-            return panel;
+            const string prefabPath = "Assets/prefab/UI/SaveDishPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
+
+            instance.transform.SetParent(parent, false);
+            instance.name = "SaveDishPanel";
+            Debug.Log("Build MVP Scene: SaveDishPanel instantiated directly from prefab.");
+            return instance.GetComponent<SaveDishUI>();
         }
 
         private static MenuUI CreateMenuPanel(Transform parent)
         {
-            var panel = CreatePanel<MenuUI>(parent, "MenuPanel");
-            var text = CreateTitle(panel.transform, "我的食单");
-            var dishRoot = CreateButtonColumn(panel.transform);
-            var dishButtonTemplate = CreateButton(dishRoot.transform, "菜品");
-            dishButtonTemplate.gameObject.SetActive(false);
-            var backButton = CreateButton(panel.transform, "返回食单");
-            backButton.gameObject.SetActive(false);
-            var button = CreateButton(panel.transform, "再做一道");
-            Assign(panel, "dishesText", text);
-            Assign(panel, "dishesButtonRoot", dishRoot.transform);
-            Assign(panel, "dishButtonTemplate", dishButtonTemplate);
-            Assign(panel, "backButton", backButton);
-            UnityEventTools.AddPersistentListener(backButton.onClick, panel.BackToDishes);
-            UnityEventTools.AddPersistentListener(button.onClick, panel.CookAgain);
-            return panel;
+            const string prefabPath = "Assets/prefab/UI/MenuPanel.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+                throw new InvalidOperationException($"Missing prefab: {prefabPath}");
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException($"Failed to instantiate prefab: {prefabPath}");
+
+            instance.transform.SetParent(parent, false);
+            instance.name = "MenuPanel";
+            Debug.Log("Build MVP Scene: MenuPanel instantiated directly from prefab.");
+            return instance.GetComponent<MenuUI>();
         }
 
         private static GameObject CreateButtonColumn(Transform parent)
