@@ -314,7 +314,7 @@ namespace CookingSimulator.Core
             }
 
             currentLogPath = saveManager.SaveLog(currentLog);
-            currentReview = reviewManager.CreateLocalReview(currentDishId, currentRecipe, currentLog);
+            currentReview = ReviewManager.CreateLocalReview(currentDishId, currentRecipe, currentLog);
             saveManager.SaveReview(currentReview);
 
             // 直接进入保存界面（AI评价在保存时并行请求）
@@ -474,7 +474,8 @@ namespace CookingSimulator.Core
 
         // ── 状态机 ──
 
-        private bool TryApplyAction(string action, out DishState nextState)
+        /// <summary>纯逻辑状态转换检查，可直接用于单元测试。</summary>
+        public static bool TryApplyAction(DishState currentState, string action, out DishState nextState)
         {
             nextState = currentState;
 
@@ -510,6 +511,11 @@ namespace CookingSimulator.Core
             }
 
             return false;
+        }
+
+        private bool TryApplyAction(string action, out DishState nextState)
+        {
+            return TryApplyAction(currentState, action, out nextState);
         }
 
         // ── 烹饪协程 ──
@@ -573,7 +579,7 @@ namespace CookingSimulator.Core
             Debug.Log($"[Cooking] 协程结束, 总烹饪时间={cookingElapsed:F1}s");
         }
 
-        private static DonenessLevel CalculateDoneness(float progress, float fullThreshold)
+        public static DonenessLevel CalculateDoneness(float progress, float fullThreshold)
         {
             if (fullThreshold <= 0f)
                 return DonenessLevel.FullyCooked;

@@ -8,7 +8,7 @@ namespace CookingSimulator.Services
 {
     public class ReviewManager : MonoBehaviour
     {
-        public ReviewData CreateLocalReview(string dishId, RecipeData recipe, CookingLog log)
+        public static ReviewData CreateLocalReview(string dishId, RecipeData recipe, CookingLog log)
         {
             var required = new HashSet<string>();
             foreach (var step in recipe.steps)
@@ -77,7 +77,7 @@ namespace CookingSimulator.Services
         /// <summary>
         /// 熟度评分：全熟 +10，半生 +5，全生 0，过头 -5
         /// </summary>
-        private static int GetDonenessScore(DonenessLevel level)
+        public static int GetDonenessScore(DonenessLevel level)
         {
             switch (level)
             {
@@ -94,7 +94,7 @@ namespace CookingSimulator.Services
             }
         }
 
-        private static string GetDonenessChinese(DonenessLevel level)
+        public static string GetDonenessChinese(DonenessLevel level)
         {
             switch (level)
             {
