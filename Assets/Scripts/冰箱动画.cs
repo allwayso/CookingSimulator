@@ -48,7 +48,6 @@ public class 冰箱动画 : MonoBehaviour
 
         float dist = Vector3.Distance(bodyCenter, player.position);
         bool inRange = dist < triggerDistance;
-        Debug.Log("[Fridge] dist=" + dist.ToString("F2") + " trigger=" + triggerDistance + " inRange=" + inRange + " bodyCenter=" + bodyCenter + " player=" + player.position);
 
         if (inRange && currentFrame < frames.Length - 1)
         {

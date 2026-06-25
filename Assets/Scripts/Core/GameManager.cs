@@ -607,35 +607,6 @@ namespace CookingSimulator.Core
             cookingUI.UpdateContainerDisplay(hasPan, hasPlate);
         }
 
-        // ── 辅助 ──
-
-        private RecipeData LoadRecipeForDish(DishData dish)
-        {
-            var recipes = recipeManager.LoadRecipes();
-            foreach (var recipe in recipes)
-            {
-                if (!string.IsNullOrWhiteSpace(dish.logPath))
-                {
-                    var log = LoadLog(dish.logPath);
-                    if (log != null && log.recipeId == recipe.recipeId)
-                    {
-                        return recipe;
-                    }
-                }
-            }
-
-            return recipes.Count > 0 ? recipes[0] : new RecipeData
-            {
-                recipeId = "unknown",
-                name = "未知菜谱",
-                description = string.Empty,
-                ingredients = Array.Empty<string>(),
-                seasonings = Array.Empty<string>(),
-                steps = Array.Empty<RecipeStep>(),
-                ingredientCookingConfigs = Array.Empty<IngredientCookingConfig>()
-            };
-        }
-
         private static CookingLog LoadLog(string path)
         {
             if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))

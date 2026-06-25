@@ -70,11 +70,5 @@ namespace CookingSimulator.UI
                 Destroy(child.gameObject);
             }
         }
-
-        private void SetBackButton(bool visible)
-        {
-            if (backButton != null)
-                backButton.gameObject.SetActive(visible);
-        }
     }
 }

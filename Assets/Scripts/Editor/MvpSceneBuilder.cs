@@ -980,111 +980,6 @@ namespace CookingSimulator.Editor
             return instance.GetComponent<MenuUI>();
         }
 
-        private static GameObject CreateButtonColumn(Transform parent)
-        {
-            var column = new GameObject("DishButtonColumn", typeof(RectTransform));
-            column.transform.SetParent(parent, false);
-            SetPreferredSize(column, 760, 260);
-            var layout = column.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 10;
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.childControlWidth = false;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-            return column;
-        }
-
-        private static Text CreateScrollableTextArea(Transform parent)
-        {
-            var scrollObject = new GameObject("ReviewScrollView", typeof(RectTransform));
-            scrollObject.transform.SetParent(parent, false);
-            SetPreferredSize(scrollObject, 760, 320);
-            var scrollImage = scrollObject.AddComponent<Image>();
-            scrollImage.color = new Color(1f, 1f, 1f, 0.06f);
-            var scrollRect = scrollObject.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-
-            var viewport = new GameObject("Viewport", typeof(RectTransform));
-            viewport.transform.SetParent(scrollObject.transform, false);
-            var viewportRect = viewport.GetComponent<RectTransform>();
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = new Vector2(12, 12);
-            viewportRect.offsetMax = new Vector2(-24, -12);
-            var viewportImage = viewport.AddComponent<Image>();
-            viewportImage.color = new Color(1f, 1f, 1f, 0.02f);
-            viewport.AddComponent<Mask>().showMaskGraphic = false;
-
-            var content = new GameObject("Content", typeof(RectTransform));
-            content.transform.SetParent(viewport.transform, false);
-            var contentRect = content.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0, 1);
-            contentRect.anchorMax = new Vector2(1, 1);
-            contentRect.pivot = new Vector2(0.5f, 1);
-            contentRect.sizeDelta = new Vector2(0, 320);
-            var contentFitter = content.AddComponent<ContentSizeFitter>();
-            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var text = CreateText(content.transform, string.Empty);
-            text.alignment = TextAnchor.UpperLeft;
-            text.fontSize = 22;
-            var textRect = text.GetComponent<RectTransform>();
-            textRect.anchorMin = new Vector2(0, 1);
-            textRect.anchorMax = new Vector2(1, 1);
-            textRect.pivot = new Vector2(0.5f, 1);
-            textRect.sizeDelta = new Vector2(0, 320);
-            var textLayout = text.gameObject.GetComponent<LayoutElement>();
-            textLayout.preferredHeight = 320;
-            textLayout.minHeight = 320;
-
-            var scrollbar = CreateVerticalScrollbar(scrollObject.transform);
-            scrollRect.viewport = viewportRect;
-            scrollRect.content = contentRect;
-            scrollRect.verticalScrollbar = scrollbar;
-            scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
-            return text;
-        }
-
-        private static Scrollbar CreateVerticalScrollbar(Transform parent)
-        {
-            var scrollbarObject = new GameObject("Scrollbar", typeof(RectTransform));
-            scrollbarObject.transform.SetParent(parent, false);
-            var rect = scrollbarObject.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(1, 0);
-            rect.anchorMax = new Vector2(1, 1);
-            rect.pivot = new Vector2(1, 1);
-            rect.sizeDelta = new Vector2(16, 0);
-            rect.offsetMin = new Vector2(-16, 0);
-            rect.offsetMax = Vector2.zero;
-
-            var background = scrollbarObject.AddComponent<Image>();
-            background.color = new Color(1f, 1f, 1f, 0.08f);
-            var scrollbar = scrollbarObject.AddComponent<Scrollbar>();
-            scrollbar.direction = Scrollbar.Direction.BottomToTop;
-
-            var slidingArea = new GameObject("Sliding Area", typeof(RectTransform));
-            slidingArea.transform.SetParent(scrollbarObject.transform, false);
-            var slidingRect = slidingArea.GetComponent<RectTransform>();
-            slidingRect.anchorMin = Vector2.zero;
-            slidingRect.anchorMax = Vector2.one;
-            slidingRect.offsetMin = new Vector2(2, 2);
-            slidingRect.offsetMax = new Vector2(-2, -2);
-
-            var handle = new GameObject("Handle", typeof(RectTransform));
-            handle.transform.SetParent(slidingArea.transform, false);
-            var handleRect = handle.GetComponent<RectTransform>();
-            handleRect.anchorMin = Vector2.zero;
-            handleRect.anchorMax = Vector2.one;
-            handleRect.offsetMin = Vector2.zero;
-            handleRect.offsetMax = Vector2.zero;
-            var handleImage = handle.AddComponent<Image>();
-            handleImage.color = new Color(0.35f, 0.66f, 0.9f, 0.95f);
-            scrollbar.targetGraphic = handleImage;
-            scrollbar.handleRect = handleRect;
-            return scrollbar;
-        }
-
         private static T CreatePanel<T>(Transform parent, string name) where T : MonoBehaviour
         {
             var panel = new GameObject(name);
@@ -1100,34 +995,6 @@ namespace CookingSimulator.Editor
             layout.padding = new RectOffset(32, 32, 32, 32);
             layout.spacing = 16;
             layout.childAlignment = TextAnchor.UpperCenter;
-            return panel.AddComponent<T>();
-        }
-
-        private static T CreatePixelPanel<T>(Transform parent, string name, float width, float height) where T : MonoBehaviour
-        {
-            var panel = new GameObject(name);
-            panel.transform.SetParent(parent, false);
-            var rect = panel.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(width, height);
-
-            var image = panel.AddComponent<Image>();
-            image.color = new Color(0.08f, 0.07f, 0.06f, 0.86f);
-            var outline = panel.AddComponent<Outline>();
-            outline.effectColor = new Color(0.94f, 0.76f, 0.38f, 1f);
-            outline.effectDistance = new Vector2(4, -4);
-
-            var layout = panel.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(28, 28, 28, 28);
-            layout.spacing = 14;
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.childControlWidth = false;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
             return panel.AddComponent<T>();
         }
 
@@ -1151,30 +1018,6 @@ namespace CookingSimulator.Editor
             label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             SetPreferredSize(obj, 760, 44);
             return label;
-        }
-
-        private static InputField CreateInput(Transform parent, string placeholder)
-        {
-            var obj = new GameObject(placeholder + "Input", typeof(RectTransform));
-            obj.transform.SetParent(parent, false);
-            SetPreferredSize(obj, 420, 48);
-            var image = obj.AddComponent<Image>();
-            image.color = new Color(0.96f, 0.9f, 0.72f);
-            var outline = obj.AddComponent<Outline>();
-            outline.effectColor = new Color(0.18f, 0.12f, 0.08f);
-            outline.effectDistance = new Vector2(3, -3);
-            var input = obj.AddComponent<InputField>();
-            var text = CreateText(obj.transform, string.Empty);
-            text.color = new Color(0.12f, 0.08f, 0.05f);
-            text.alignment = TextAnchor.MiddleLeft;
-            StretchChild(text.gameObject, 14, 8, -14, -8);
-            var hint = CreateText(obj.transform, placeholder);
-            hint.color = new Color(0.45f, 0.34f, 0.24f);
-            hint.alignment = TextAnchor.MiddleLeft;
-            StretchChild(hint.gameObject, 14, 8, -14, -8);
-            input.textComponent = text;
-            input.placeholder = hint;
-            return input;
         }
 
         private static Button CreateButton(Transform parent, string text)
@@ -1203,43 +1046,6 @@ namespace CookingSimulator.Editor
             label.fontSize = 24;
             label.color = new Color(1f, 0.94f, 0.72f);
             StretchChild(label.gameObject, 0, 0, 0, 0);
-            return button;
-        }
-
-        private static Button CreatePrefabButton(Transform parent, string prefabPath, string text)
-        {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-            if (prefab == null)
-            {
-                return CreateButton(parent, text);
-            }
-
-            var obj = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-            if (obj == null)
-            {
-                return CreateButton(parent, text);
-            }
-
-            obj.transform.SetParent(parent, false);
-            obj.name = text + "Button";
-
-            var button = obj.GetComponent<Button>() ?? obj.AddComponent<Button>();
-            button.onClick.RemoveAllListeners();
-            for (var index = button.onClick.GetPersistentEventCount() - 1; index >= 0; index--)
-            {
-                UnityEventTools.RemovePersistentListener(button.onClick, index);
-            }
-
-            var label = obj.GetComponentInChildren<Text>();
-            if (label != null)
-            {
-                label.text = text;
-            }
-
-            var layout = obj.GetComponent<LayoutElement>() ?? obj.AddComponent<LayoutElement>();
-            layout.preferredWidth = 260;
-            layout.preferredHeight = 48;
-            layout.minHeight = 48;
             return button;
         }
 
