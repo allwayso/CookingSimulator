@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using CookingSimulator.Models;
 using UnityEngine;
 using UnityEngine.UI;
@@ -45,6 +47,20 @@ namespace CookingSimulator.UI
         private Action<int> onFireLevelChanged;
 
         private string selectedIngredient = "鸡蛋";
+
+        [Header("Timed Popup Hints")]
+        [SerializeField] private GameObject popupRoot;
+        [SerializeField] private Text popupTitleText;
+        [SerializeField] private Text popupBodyText;
+        [SerializeField] private Button popupCloseButton;
+        [SerializeField] private CanvasGroup popupCanvasGroup;
+
+        private TimedHint[] timedHints;
+        private int nextHintIndex;
+        private Coroutine hintSequenceCoroutine;
+        private Coroutine activePopupCoroutine;
+        private float cookingStartTime;
+        private Dictionary<string, IngredientCookState> trackedIngredientStates;
 
         private static readonly string[] FireLevelNames = { "关火", "小火", "中火", "大火", "猛火" };
 
@@ -100,6 +116,25 @@ namespace CookingSimulator.UI
         public void ShowMessage(string message)
         {
             messageText.text = message;
+            if (messageClearCoroutine != null)
+                StopCoroutine(messageClearCoroutine);
+            messageClearCoroutine = StartCoroutine(ClearMessageAfterDelay(4f));
+        }
+
+        /// <summary>GameManager 在步骤推进后调用，显示当前步骤提示。</summary>
+        public void SetStepHint(string hint)
+        {
+            if (hintText != null)
+                hintText.text = hint;
+        }
+
+        private Coroutine messageClearCoroutine;
+
+        private IEnumerator ClearMessageAfterDelay(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            messageText.text = string.Empty;
+            messageClearCoroutine = null;
         }
 
         public void OnFireSliderChanged(float value)
@@ -272,6 +307,158 @@ namespace CookingSimulator.UI
         public void Finish()
         {
             onFinish?.Invoke();
+        }
+
+        // ── 定时弹窗提示 ──
+
+        /// <summary>GameManager 在进入 Cooking 状态时调用，启动弹窗序列。</summary>
+        public void StartTimedHints(TimedHint[] hints, Dictionary<string, IngredientCookState> states)
+        {
+            timedHints = hints;
+            trackedIngredientStates = states;
+            nextHintIndex = 0;
+            cookingStartTime = Time.time;
+
+            if (hints != null && hints.Length > 0)
+                hintSequenceCoroutine = StartCoroutine(TimedHintSequence());
+        }
+
+        /// <summary>GameManager 在离开 Cooking 状态时调用，停止弹窗序列。</summary>
+        public void StopTimedHints()
+        {
+            if (hintSequenceCoroutine != null)
+            {
+                StopCoroutine(hintSequenceCoroutine);
+                hintSequenceCoroutine = null;
+            }
+            if (activePopupCoroutine != null)
+            {
+                StopCoroutine(activePopupCoroutine);
+                activePopupCoroutine = null;
+            }
+            HidePopupImmediate();
+            timedHints = null;
+            trackedIngredientStates = null;
+            nextHintIndex = 0;
+        }
+
+        private IEnumerator TimedHintSequence()
+        {
+            while (timedHints != null && nextHintIndex < timedHints.Length)
+            {
+                var hint = timedHints[nextHintIndex];
+                float elapsed = Time.time - cookingStartTime;
+                float waitTime = hint.triggerTime - elapsed;
+
+                if (waitTime > 0f)
+                    yield return new WaitForSeconds(waitTime);
+
+                // 条件门控：仅当 condition 满足（或为空）时显示弹窗
+                if (CheckHintCondition(hint.condition))
+                {
+                    ShowPopup(hint.title, hint.body, hint.duration);
+                }
+
+                nextHintIndex++;
+            }
+            hintSequenceCoroutine = null;
+        }
+
+        private bool CheckHintCondition(string condition)
+        {
+            if (string.IsNullOrEmpty(condition) || trackedIngredientStates == null)
+                return true;
+
+            switch (condition)
+            {
+                case "eggInPan":
+                    return trackedIngredientStates.TryGetValue("鸡蛋", out var es) && es.isInPan;
+                case "tomatoInPan":
+                    return trackedIngredientStates.TryGetValue("番茄", out var ts) && ts.isInPan;
+                case "eggOnPlate":
+                    return trackedIngredientStates.TryGetValue("鸡蛋", out var ep) && ep.hasActivated && !ep.isInPan;
+                case "tomatoOnPlate":
+                    return trackedIngredientStates.TryGetValue("番茄", out var tp) && tp.hasActivated && !tp.isInPan;
+                default:
+                    return true;
+            }
+        }
+
+        public void ShowPopup(string title, string body, float duration)
+        {
+            if (popupRoot == null) return;
+
+            // 先停掉当前弹窗
+            if (activePopupCoroutine != null)
+            {
+                StopCoroutine(activePopupCoroutine);
+                activePopupCoroutine = null;
+            }
+
+            popupTitleText.text = title;
+            popupBodyText.text = body;
+            popupRoot.SetActive(true);
+
+            StartCoroutine(AnimatePopupIn());
+
+            activePopupCoroutine = StartCoroutine(PopupAutoDismiss(duration));
+        }
+
+        public void OnPopupCloseClicked()
+        {
+            if (activePopupCoroutine != null)
+            {
+                StopCoroutine(activePopupCoroutine);
+                activePopupCoroutine = null;
+            }
+            HidePopupImmediate();
+        }
+
+        private IEnumerator PopupAutoDismiss(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            yield return StartCoroutine(AnimatePopupOut());
+            HidePopupImmediate();
+            activePopupCoroutine = null;
+        }
+
+        private IEnumerator AnimatePopupIn()
+        {
+            if (popupCanvasGroup == null) yield break;
+
+            var targetScale = Vector3.one;
+            var startScale = new Vector3(0.85f, 0.85f, 1f);
+            float t = 0f;
+            while (t < 0.25f)
+            {
+                t += Time.deltaTime;
+                float p = t / 0.25f;
+                popupCanvasGroup.alpha = Mathf.Lerp(0f, 1f, p);
+                popupRoot.transform.localScale = Vector3.Lerp(startScale, targetScale, p);
+                yield return null;
+            }
+            popupCanvasGroup.alpha = 1f;
+            popupRoot.transform.localScale = targetScale;
+        }
+
+        private IEnumerator AnimatePopupOut()
+        {
+            if (popupCanvasGroup == null) yield break;
+
+            float t = 0f;
+            float startAlpha = popupCanvasGroup.alpha;
+            while (t < 0.2f)
+            {
+                t += Time.deltaTime;
+                popupCanvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, t / 0.2f);
+                yield return null;
+            }
+        }
+
+        private void HidePopupImmediate()
+        {
+            if (popupRoot != null)
+                popupRoot.SetActive(false);
         }
 
         // ── 辅助方法 ──

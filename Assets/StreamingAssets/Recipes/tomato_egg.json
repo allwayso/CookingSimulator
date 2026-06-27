@@ -4,7 +4,7 @@
   "description": "先炒鸡蛋盛出，再炒番茄出沙，最后混合调味出锅。",
   "ingredients": ["番茄", "鸡蛋"],
   "seasonings": ["盐"],
-  "timedPopupDelays": [5, 10, 16, 22],
+  "timedPopupDelays": [],
   "steps": [
     { "order": 1, "action": "cut",               "target": "番茄",  "hint": "先把番茄切好。" },
     { "order": 2, "action": "put_in_pan",        "target": "鸡蛋",  "hint": "选择鸡蛋后点击下锅，开始炒鸡蛋。" },
@@ -18,5 +18,49 @@
   "ingredientCookingConfigs": [
     { "ingredientName": "番茄", "fullCookThreshold": 120 },
     { "ingredientName": "鸡蛋", "fullCookThreshold": 40 }
+  ],
+  "timedHints": [
+    {
+      "triggerTime": 2.0,
+      "duration": 3.0,
+      "title": "保持中火",
+      "body": "鸡蛋在锅里，中火烹饪，观察熟度条变绿",
+      "condition": "eggInPan"
+    },
+    {
+      "triggerTime": 10.5,
+      "duration": 2.5,
+      "title": "盛出鸡蛋",
+      "body": "鸡蛋快全熟了，点击【锅】盛到盘子里",
+      "condition": "eggInPan"
+    },
+    {
+      "triggerTime": 13.0,
+      "duration": 3.0,
+      "title": "番茄下锅",
+      "body": "选中番茄，点击【下锅】，等待出沙",
+      "condition": "tomatoInPan"
+    },
+    {
+      "triggerTime": 25.0,
+      "duration": 3.0,
+      "title": "耐心等待",
+      "body": "番茄还在煮，保持中火，不需要操作",
+      "condition": "tomatoInPan"
+    },
+    {
+      "triggerTime": 50.0,
+      "duration": 2.0,
+      "title": "鸡蛋回锅",
+      "body": "番茄出沙了，点击【盘子】把鸡蛋倒回锅中",
+      "condition": "tomatoInPan"
+    },
+    {
+      "triggerTime": 54.0,
+      "duration": 3.0,
+      "title": "收尾",
+      "body": "依次点击：加调料 → 翻炒 → 出锅",
+      "condition": ""
+    }
   ]
 }
