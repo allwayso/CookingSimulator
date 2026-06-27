@@ -38,6 +38,10 @@ namespace CookingSimulator.Services
             {
                 var existing = JsonUtility.FromJson<UserData>(File.ReadAllText(path));
                 existing.lastLoginAt = DateTime.UtcNow.ToString("O");
+                if (existing.lifeValue == 0)
+                {
+                    existing.lifeValue = 100;
+                }
                 SaveUser(existing);
                 return existing;
             }
@@ -108,6 +112,20 @@ namespace CookingSimulator.Services
                 {
                     dishes.Add(dish);
                 }
+            }
+
+            dishes.Sort((left, right) => string.CompareOrdinal(right.createdAt, left.createdAt));
+            return dishes;
+        }
+
+        public List<DishData> LoadAllDishes()
+        {
+            EnsureDirectories();
+            var dishes = new List<DishData>();
+            foreach (var path in Directory.GetFiles(DishesPath, "*.json"))
+            {
+                var dish = JsonUtility.FromJson<DishData>(File.ReadAllText(path));
+                dishes.Add(dish);
             }
 
             dishes.Sort((left, right) => string.CompareOrdinal(right.createdAt, left.createdAt));

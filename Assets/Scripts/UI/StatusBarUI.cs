@@ -23,5 +23,21 @@ namespace CookingSimulator.UI
 
             statusText.text = $"厨神：{user.username}  声望：{user.reputation}";
         }
+
+        public void ShowFoodie(UserData user)
+        {
+            gameObject.SetActive(true);
+            RefreshFoodie(user);
+        }
+
+        public void RefreshFoodie(UserData user)
+        {
+            if (statusText == null || user == null)
+            {
+                return;
+            }
+
+            statusText.text = $"美食家：{user.username}  生命值：{user.lifeValue}";
+        }
     }
 }

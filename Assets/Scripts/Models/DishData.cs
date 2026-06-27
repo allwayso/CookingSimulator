@@ -11,6 +11,7 @@ namespace CookingSimulator.Models
         public string name;
         public float price;
         public int score;
+        public int objectiveScore;
         public DishState finalState;
         public string logPath;
         public string reviewId;

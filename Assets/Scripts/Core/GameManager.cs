@@ -24,6 +24,7 @@ namespace CookingSimulator.Core
         [SerializeField] private CookingUI cookingUI;
         [SerializeField] private ReviewUI reviewUI;
         [SerializeField] private SaveDishUI saveDishUI;
+        [SerializeField] private ReviewWriteUI reviewWriteUI;
         [SerializeField] private MenuUI menuUI;
         [SerializeField] private StatusBarUI statusBarUI;
         [SerializeField] private GameObject loginBackgroundRoot;
@@ -41,6 +42,7 @@ namespace CookingSimulator.Core
         private DishState currentState;
         private string currentDishId;
         private string currentLogPath;
+        private DishData currentFoodieDish;
 
         // 火力 & 熟度系统
         private int currentFireLevel;
@@ -51,6 +53,7 @@ namespace CookingSimulator.Core
 
         private bool ingredientsReady;
         private RecipeData selectedRecipe;
+        private int currentStepIndex;
 
         private void Start()
         {
@@ -73,7 +76,7 @@ namespace CookingSimulator.Core
         {
             currentUser = saveManager.LoadOrCreateUser(username);
             statusBarUI?.Show(currentUser);
-            modeSelectUI.Show(currentUser, EnterChefMode);
+            modeSelectUI.Show(currentUser, EnterChefMode, EnterFoodieMode);
             Hide(loginUI);
             SetLoginBackgroundVisible(true);
         }
@@ -158,6 +161,7 @@ namespace CookingSimulator.Core
             currentRecipe = recipe;
             currentDishId = Guid.NewGuid().ToString("N");
             currentState = DishState.Raw;
+            currentStepIndex = 0;
             currentFireLevel = 1; // 默认小火
 
             // 初始化食材熟度追踪（所有食材初始在盘子上/未使用）
@@ -187,12 +191,32 @@ namespace CookingSimulator.Core
             // 做菜时隐藏厨房物体
             if (fridgeObject != null) fridgeObject.SetActive(false);
             if (playerObject != null) playerObject.SetActive(false);
+
+            AdvanceStep(); // 显示第一步提示 + 自动选中食材
         }
 
         // ── 动作处理 ──
 
         public void HandleCookingAction(string action, string target)
         {
+            // ── 步骤拦截：必须按菜谱 steps[] 顺序执行 ──
+            if (currentRecipe == null || currentRecipe.steps == null || currentStepIndex >= currentRecipe.steps.Length)
+            {
+                cookingUI.ShowMessage("没有可执行的步骤");
+                return;
+            }
+            var step = currentRecipe.steps[currentStepIndex];
+            if (action != step.action)
+            {
+                cookingUI.ShowMessage($"当前应该：{step.hint}");
+                return;
+            }
+            if (action == "put_in_pan" && target != step.target)
+            {
+                cookingUI.ShowMessage($"当前应该：{step.hint}");
+                return;
+            }
+
             var before = currentState;
             if (!TryApplyAction(action, out var after))
             {
@@ -216,16 +240,21 @@ namespace CookingSimulator.Core
             if (after == DishState.Cooking && before != DishState.Cooking)
             {
                 EnsureCoroutineRunning();
+                cookingUI.StartTimedHints(currentRecipe.timedHints, ingredientStates);
             }
             // 离开 Cooking 状态时停止协程
             if (before == DishState.Cooking && after != DishState.Cooking)
             {
                 StopCookingCoroutine();
+                cookingUI.StopTimedHints();
             }
 
             logManager.AddAction(action, target, before, after);
             cookingUI.UpdateState(currentState);
             RefreshContainerDisplay();
+
+            currentStepIndex++;
+            AdvanceStep();
         }
 
         public void HandleFireLevelChanged(int level)
@@ -233,8 +262,34 @@ namespace CookingSimulator.Core
             currentFireLevel = level;
         }
 
+        /// <summary>步骤推进：显示下一步提示，put_in_pan 步骤自动选中食材。</summary>
+        private void AdvanceStep()
+        {
+            if (currentRecipe == null || currentRecipe.steps == null || currentStepIndex >= currentRecipe.steps.Length)
+                return;
+
+            var next = currentRecipe.steps[currentStepIndex];
+            cookingUI.SetStepHint(next.hint);
+
+            if (next.action == "put_in_pan")
+                cookingUI.SelectIngredient(next.target);
+        }
+
         public void HandleTransferToPlate()
         {
+            // ── 步骤拦截 ──
+            if (currentRecipe == null || currentRecipe.steps == null || currentStepIndex >= currentRecipe.steps.Length)
+            {
+                cookingUI.ShowMessage("没有可执行的步骤");
+                return;
+            }
+            var step = currentRecipe.steps[currentStepIndex];
+            if (step.action != "transfer_to_plate")
+            {
+                cookingUI.ShowMessage($"当前应该：{step.hint}");
+                return;
+            }
+
             if (currentState != DishState.Cooking)
             {
                 cookingUI.ShowMessage("现在不能盛出");
@@ -260,10 +315,26 @@ namespace CookingSimulator.Core
             Debug.Log("[Cooking] 锅→盘 转移");
             logManager.AddAction("transfer_to_plate", "锅→盘", currentState, currentState);
             RefreshContainerDisplay();
+
+            currentStepIndex++;
+            AdvanceStep();
         }
 
         public void HandleTransferToPan()
         {
+            // ── 步骤拦截 ──
+            if (currentRecipe == null || currentRecipe.steps == null || currentStepIndex >= currentRecipe.steps.Length)
+            {
+                cookingUI.ShowMessage("没有可执行的步骤");
+                return;
+            }
+            var step = currentRecipe.steps[currentStepIndex];
+            if (step.action != "transfer_to_pan")
+            {
+                cookingUI.ShowMessage($"当前应该：{step.hint}");
+                return;
+            }
+
             if (currentState != DishState.Cooking)
             {
                 cookingUI.ShowMessage("现在不能倒回");
@@ -290,6 +361,9 @@ namespace CookingSimulator.Core
             EnsureCoroutineRunning();
             logManager.AddAction("transfer_to_pan", "盘→锅", currentState, currentState);
             RefreshContainerDisplay();
+
+            currentStepIndex++;
+            AdvanceStep();
         }
 
         public void FinishCooking()
@@ -335,6 +409,7 @@ namespace CookingSimulator.Core
                 logPath = currentLogPath,
                 reviewId = currentReview.reviewId,
                 reviewText = currentReview.summary,
+                objectiveScore = currentReview.score,
                 createdAt = DateTime.UtcNow.ToString("O")
             };
             saveManager.SaveDish(dish);
@@ -394,7 +469,13 @@ namespace CookingSimulator.Core
 
         public void ShowDishReviews(DishData dish)
         {
-            // 加载该菜品所有保存的评价
+            var reviews = LoadReviewsForDish(dish);
+            reviewUI.ShowMultiple(reviews, ShowMenu);
+            Hide(menuUI);
+        }
+
+        private List<ReviewData> LoadReviewsForDish(DishData dish)
+        {
             var reviews = new List<ReviewData>();
 
             if (dish.reviewIds != null)
@@ -408,13 +489,97 @@ namespace CookingSimulator.Core
 
             if (reviews.Count == 0)
             {
-                // 还没评价或只有本地评价，用菜品的本地评价兜底
                 var localReview = saveManager.LoadReview(dish.reviewId);
                 if (localReview != null) reviews.Add(localReview);
             }
 
-            reviewUI.ShowMultiple(reviews, ShowMenu);
+            return reviews;
+        }
+
+        // ── Foodie Mode ─────────────────────────────────────
+
+        public static float GetCombinedScore(DishData dish, int foodieScore)
+        {
+            int objScore = dish.objectiveScore != 0 ? dish.objectiveScore : 80;
+            return objScore * 0.8f + foodieScore * 0.2f;
+        }
+
+        public static int CalculateLifeDelta(float combinedScore)
+        {
+            int raw = Mathf.FloorToInt((combinedScore - 80) / 5f);
+            return raw + (raw >= 0 ? 1 : -1);
+        }
+
+        public void EnterFoodieMode()
+        {
+            var allDishes = saveManager.LoadAllDishes();
+            menuUI.ShowDishes(allDishes, null, ShowFoodieDishReviews, "食单");
+            statusBarUI?.ShowFoodie(currentUser);
+            Hide(modeSelectUI);
+            SetLoginBackgroundVisible(false);
+        }
+
+        public void ShowFoodieDishReviews(DishData dish)
+        {
+            currentFoodieDish = dish;
+            var reviews = LoadReviewsForDish(dish);
+            reviewUI.ShowMultiple(reviews, EnterReviewWrite, "写评价");
             Hide(menuUI);
+        }
+
+        public void EnterReviewWrite()
+        {
+            Hide(reviewUI);
+            reviewWriteUI.Show(currentFoodieDish, SubmitFoodieReview, ReturnToFoodieMenu);
+        }
+
+        public void SubmitFoodieReview(int foodieScore, string comment)
+        {
+            var review = new ReviewData
+            {
+                reviewId = Guid.NewGuid().ToString("N"),
+                dishId = currentFoodieDish.dishId,
+                reviewerName = currentUser.username,
+                reviewerId = currentUser.userId,
+                score = foodieScore,
+                summary = comment,
+                suggestion = $"来自美食家 {currentUser.username} 的评价",
+                reputationDelta = 0,
+                createdAt = DateTime.UtcNow.ToString("O")
+            };
+            saveManager.SaveReview(review);
+
+            if (currentFoodieDish.reviewIds == null)
+                currentFoodieDish.reviewIds = new List<string>();
+            currentFoodieDish.reviewIds.Add(review.reviewId);
+
+            // 重算口碑分（所有评价的平均）
+            var allReviews = LoadReviewsForDish(currentFoodieDish);
+            int totalScore = 0;
+            foreach (var r in allReviews) totalScore += r.score;
+            currentFoodieDish.score = allReviews.Count > 0 ? totalScore / allReviews.Count : foodieScore;
+            currentFoodieDish.reviewText = comment;
+            saveManager.SaveDish(currentFoodieDish);
+
+            // 生命值变化
+            float combined = GetCombinedScore(currentFoodieDish, foodieScore);
+            int lifeDelta = CalculateLifeDelta(combined);
+            currentUser.lifeValue += lifeDelta;
+            saveManager.SaveUser(currentUser);
+            statusBarUI?.RefreshFoodie(currentUser);
+
+            Debug.Log($"[Foodie] 评价菜品: {currentFoodieDish.name}, 客观分={currentFoodieDish.objectiveScore}, "
+                + $"主观分={foodieScore}, combined={combined:F1}, lifeDelta={lifeDelta:+0;-#}, lifeValue={currentUser.lifeValue}");
+
+            Hide(reviewWriteUI);
+            ReturnToFoodieMenu();
+        }
+
+        public void ReturnToFoodieMenu()
+        {
+            Hide(reviewUI);
+            var allDishes = saveManager.LoadAllDishes();
+            menuUI.ShowDishes(allDishes, null, ShowFoodieDishReviews, "食单");
         }
 
         public void ShowMenu()

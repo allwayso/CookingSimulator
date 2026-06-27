@@ -11,5 +11,6 @@ namespace CookingSimulator.Models
         public int reputation;
         public string createdAt;
         public string lastLoginAt;
+        public int lifeValue = 100;
     }
 }

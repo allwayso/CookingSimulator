@@ -15,14 +15,17 @@ namespace CookingSimulator.UI
 
         private Action onCookAgain;
         private Action<DishData> onDishClicked;
+        private Action onBack;
 
-        public void ShowDishes(List<DishData> dishes, Action cookAgainAction, Action<DishData> dishClickedAction)
+        public void ShowDishes(List<DishData> dishes, Action cookAgainAction, Action<DishData> dishClickedAction,
+            string title = "厨神菜单", Action backAction = null)
         {
             onCookAgain = cookAgainAction;
             onDishClicked = dishClickedAction;
+            onBack = backAction;
             gameObject.SetActive(true);
             ClearDishButtons();
-            dishesText.text = "厨神菜单";
+            dishesText.text = title;
 
             if (dishes.Count == 0)
                 return;
@@ -38,6 +41,7 @@ namespace CookingSimulator.UI
 
         public void BackToDishes()
         {
+            onBack?.Invoke();
         }
 
         private void CreateDishButton(DishData dish)

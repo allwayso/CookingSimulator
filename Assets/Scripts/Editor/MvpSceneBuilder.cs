@@ -52,6 +52,8 @@ namespace CookingSimulator.Editor
             var statusBar = CreateStatusBar(canvas.transform);
             var ingredientSelect = CreateIngredientSelectPanel(canvas.transform);
             ingredientSelect.gameObject.SetActive(false);
+            var reviewWrite = CreateReviewWritePanel(canvas.transform);
+            reviewWrite.gameObject.SetActive(false);
 
             // 交互管理器（默认关闭，FreeRoam 时激活）
             var interactionManagerObj = new GameObject("InteractionManager");
@@ -88,6 +90,7 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "ingredientSelectUI", ingredientSelect);
             Assign(gameManager, "playerObject", character);
             Assign(gameManager, "fridgeObject", fridge);
+            Assign(gameManager, "reviewWriteUI", reviewWrite);
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
@@ -465,6 +468,17 @@ namespace CookingSimulator.Editor
                 throw new InvalidOperationException("ModePanel prefab must have ModeSelectUI component.");
             }
 
+            // Wire Foodie Mode button
+            var laobaButton = instance.transform.Find("LaobaButton");
+            if (laobaButton != null)
+            {
+                var btn = laobaButton.GetComponent<Button>();
+                if (btn != null)
+                {
+                    UnityEventTools.AddPersistentListener(btn.onClick, modeUI.EnterFoodieMode);
+                }
+            }
+
             return modeUI;
         }
 
@@ -619,6 +633,18 @@ namespace CookingSimulator.Editor
                     Assign(cookingUI, "fireSlider", fs);
                     Assign(cookingUI, "fireLevelText", flt);
                     UnityEventTools.AddPersistentListener(fs.onValueChanged, cookingUI.OnFireSliderChanged);
+                }
+
+                // 8. 定时提示弹窗
+                if (root.transform.Find("PopupPanel") == null)
+                {
+                    CreatePopupPanel(root.transform, out var popupRoot, out var titleTxt, out var bodyTxt, out var closeBtn, out var cg);
+                    Assign(cookingUI, "popupRoot", popupRoot);
+                    Assign(cookingUI, "popupTitleText", titleTxt);
+                    Assign(cookingUI, "popupBodyText", bodyTxt);
+                    Assign(cookingUI, "popupCloseButton", closeBtn);
+                    Assign(cookingUI, "popupCanvasGroup", cg);
+                    UnityEventTools.AddPersistentListener(closeBtn.onClick, cookingUI.OnPopupCloseClicked);
                 }
 
                 Debug.Log("CookingPanel prefab upgrade complete.");
@@ -980,6 +1006,103 @@ namespace CookingSimulator.Editor
             return instance.GetComponent<MenuUI>();
         }
 
+        private static ReviewWriteUI CreateReviewWritePanel(Transform parent)
+        {
+            var panel = CreatePanel<ReviewWriteUI>(parent, "ReviewWritePanel");
+
+            var title = CreateTitle(panel.transform, "写评价");
+
+            // 菜名
+            var dishNameText = CreateText(panel.transform, "");
+            dishNameText.fontSize = 26;
+
+            // 评分输入行
+            var scoreRow = new GameObject("ScoreRow", typeof(RectTransform));
+            scoreRow.transform.SetParent(panel.transform, false);
+            SetPreferredSize(scoreRow, 500, 44);
+            var scoreLayout = scoreRow.AddComponent<HorizontalLayoutGroup>();
+            scoreLayout.spacing = 12;
+            scoreLayout.childAlignment = TextAnchor.MiddleCenter;
+            scoreLayout.childControlWidth = false;
+            scoreLayout.childControlHeight = true;
+
+            var scoreLabel = CreateText(scoreRow.transform, "评分 (0-100):");
+            scoreLabel.fontSize = 22;
+            scoreLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(150, 32);
+
+            var scoreInputObj = new GameObject("ScoreInput", typeof(RectTransform), typeof(Image));
+            scoreInputObj.transform.SetParent(scoreRow.transform, false);
+            SetPreferredSize(scoreInputObj, 120, 40);
+            scoreInputObj.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f);
+            var scoreInputField = scoreInputObj.AddComponent<InputField>();
+            var scoreTextArea = new GameObject("Text", typeof(RectTransform));
+            scoreTextArea.transform.SetParent(scoreInputObj.transform, false);
+            var scorePlaceholder = scoreTextArea.AddComponent<Text>();
+            scorePlaceholder.fontSize = 20;
+            scorePlaceholder.color = new Color(0.5f, 0.5f, 0.5f);
+            scorePlaceholder.alignment = TextAnchor.MiddleCenter;
+            scorePlaceholder.font = scoreLabel.font;
+            scorePlaceholder.text = "0-100";
+            StretchChild(scoreTextArea, 4, 0, 4, 0);
+            scoreInputField.textComponent = scorePlaceholder;
+
+            // 评语输入行
+            var commentRow = new GameObject("CommentRow", typeof(RectTransform));
+            commentRow.transform.SetParent(panel.transform, false);
+            SetPreferredSize(commentRow, 500, 44);
+            var commentLayout = commentRow.AddComponent<HorizontalLayoutGroup>();
+            commentLayout.spacing = 12;
+            commentLayout.childAlignment = TextAnchor.MiddleCenter;
+            commentLayout.childControlWidth = false;
+            commentLayout.childControlHeight = true;
+
+            var commentLabel = CreateText(commentRow.transform, "评语:");
+            commentLabel.fontSize = 22;
+            commentLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(64, 32);
+
+            var commentInputObj = new GameObject("CommentInput", typeof(RectTransform), typeof(Image));
+            commentInputObj.transform.SetParent(commentRow.transform, false);
+            SetPreferredSize(commentInputObj, 340, 40);
+            commentInputObj.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f);
+            var commentInputField = commentInputObj.AddComponent<InputField>();
+            var commentTextArea = new GameObject("Text", typeof(RectTransform));
+            commentTextArea.transform.SetParent(commentInputObj.transform, false);
+            var commentPlaceholder = commentTextArea.AddComponent<Text>();
+            commentPlaceholder.fontSize = 20;
+            commentPlaceholder.color = new Color(0.5f, 0.5f, 0.5f);
+            commentPlaceholder.alignment = TextAnchor.MiddleLeft;
+            commentPlaceholder.font = commentLabel.font;
+            commentPlaceholder.text = "写下你的评价...";
+            StretchChild(commentTextArea, 8, 2, 8, 2);
+            commentInputField.textComponent = commentPlaceholder;
+
+            // 提示文字
+            var messageText = CreateText(panel.transform, "");
+            messageText.fontSize = 18;
+            messageText.color = new Color(0.95f, 0.5f, 0.3f);
+
+            // 按钮行
+            var buttonsRow = new GameObject("ButtonsRow", typeof(RectTransform));
+            buttonsRow.transform.SetParent(panel.transform, false);
+            SetPreferredSize(buttonsRow, 400, 48);
+            var buttonsLayout = buttonsRow.AddComponent<HorizontalLayoutGroup>();
+            buttonsLayout.spacing = 20;
+            buttonsLayout.childAlignment = TextAnchor.MiddleCenter;
+
+            var submitButton = CreateButton(buttonsRow.transform, "提交评价");
+            var cancelButton = CreateButton(buttonsRow.transform, "返回");
+
+            Assign(panel, "dishNameText", dishNameText);
+            Assign(panel, "scoreInput", scoreInputField);
+            Assign(panel, "commentInput", commentInputField);
+            Assign(panel, "messageText", messageText);
+
+            UnityEventTools.AddPersistentListener(submitButton.onClick, panel.Submit);
+            UnityEventTools.AddPersistentListener(cancelButton.onClick, panel.Cancel);
+
+            return panel;
+        }
+
         private static T CreatePanel<T>(Transform parent, string name) where T : MonoBehaviour
         {
             var panel = new GameObject(name);
@@ -1075,6 +1198,94 @@ namespace CookingSimulator.Editor
             var serializedObject = new SerializedObject(target);
             serializedObject.FindProperty(fieldName).objectReferenceValue = value;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// 创建做菜定时弹窗面板：深色半透明背景+金色描边+标题+正文+关闭按钮+CanvasGroup
+        /// </summary>
+        private static void CreatePopupPanel(Transform parent,
+            out GameObject popupRoot, out Text titleText, out Text bodyText,
+            out Button closeButton, out CanvasGroup canvasGroup)
+        {
+            // 根节点
+            popupRoot = new GameObject("PopupPanel", typeof(RectTransform));
+            popupRoot.transform.SetParent(parent, false);
+            popupRoot.transform.SetAsLastSibling();
+
+            var rootRect = popupRoot.GetComponent<RectTransform>();
+            rootRect.anchorMin = new Vector2(0.5f, 1f);
+            rootRect.anchorMax = new Vector2(0.5f, 1f);
+            rootRect.pivot = new Vector2(0.5f, 1f);
+            rootRect.anchoredPosition = new Vector2(0, -56);
+            rootRect.sizeDelta = new Vector2(620, 180);
+
+            var bgImage = popupRoot.AddComponent<Image>();
+            bgImage.color = new Color(0.10f, 0.09f, 0.08f, 0.95f);
+            bgImage.raycastTarget = false;
+
+            var outline = popupRoot.AddComponent<Outline>();
+            outline.effectColor = new Color(0.94f, 0.76f, 0.38f, 1f);
+            outline.effectDistance = new Vector2(2, -2);
+
+            canvasGroup = popupRoot.AddComponent<CanvasGroup>();
+            canvasGroup.alpha = 0f;
+
+            // 标题
+            var titleObj = new GameObject("TitleText", typeof(RectTransform));
+            titleObj.transform.SetParent(popupRoot.transform, false);
+            var titleRect = titleObj.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.5f, 1f);
+            titleRect.anchorMax = new Vector2(0.5f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.anchoredPosition = new Vector2(0, -12);
+            titleRect.sizeDelta = new Vector2(560, 32);
+            titleText = titleObj.AddComponent<Text>();
+            titleText.fontSize = 24;
+            titleText.color = new Color(0.95f, 0.88f, 0.56f);
+            titleText.alignment = TextAnchor.MiddleCenter;
+            titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            titleText.fontStyle = FontStyle.Bold;
+
+            // 正文
+            var bodyObj = new GameObject("BodyText", typeof(RectTransform));
+            bodyObj.transform.SetParent(popupRoot.transform, false);
+            var bodyRect = bodyObj.GetComponent<RectTransform>();
+            bodyRect.anchorMin = new Vector2(0f, 0f);
+            bodyRect.anchorMax = new Vector2(1f, 1f);
+            bodyRect.pivot = new Vector2(0.5f, 0.5f);
+            bodyRect.offsetMin = new Vector2(30, 16);
+            bodyRect.offsetMax = new Vector2(-30, -48);
+            bodyText = bodyObj.AddComponent<Text>();
+            bodyText.fontSize = 20;
+            bodyText.color = Color.white;
+            bodyText.alignment = TextAnchor.UpperLeft;
+            bodyText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            bodyText.horizontalOverflow = HorizontalWrapMode.Wrap;
+
+            // 关闭按钮（右上角）
+            var closeObj = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            closeObj.transform.SetParent(popupRoot.transform, false);
+            var closeRect = closeObj.GetComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(1f, 1f);
+            closeRect.anchorMax = new Vector2(1f, 1f);
+            closeRect.pivot = new Vector2(1f, 1f);
+            closeRect.anchoredPosition = new Vector2(-4, -4);
+            closeRect.sizeDelta = new Vector2(28, 28);
+            var closeImg = closeObj.GetComponent<Image>();
+            closeImg.color = new Color(0.25f, 0.18f, 0.12f);
+            closeImg.raycastTarget = true;
+            closeButton = closeObj.GetComponent<Button>();
+
+            var closeLabel = CreateText(closeObj.transform, "X");
+            closeLabel.fontSize = 18;
+            closeLabel.color = new Color(0.94f, 0.76f, 0.38f);
+            var closeLblRect = closeLabel.GetComponent<RectTransform>();
+            closeLblRect.anchorMin = Vector2.zero;
+            closeLblRect.anchorMax = Vector2.one;
+            closeLblRect.offsetMin = Vector2.zero;
+            closeLblRect.offsetMax = Vector2.zero;
+
+            popupRoot.SetActive(false);
         }
     }
 }
