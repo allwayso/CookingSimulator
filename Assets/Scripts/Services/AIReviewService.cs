@@ -2,10 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Text;
 using CookingSimulator.Models;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace CookingSimulator.Services
 {
@@ -53,7 +53,7 @@ namespace CookingSimulator.Services
             var prompt = BuildPrompt(dish, recipe, log, baseReview, persona);
             var responseText = string.Empty;
             var requestError = string.Empty;
-            yield return RunProviderRequests(providers, prompt, (response, error) =>
+            yield return TrySendWithProvidersCoroutine(providers, prompt, (response, error) =>
             {
                 responseText = response;
                 requestError = error;
@@ -94,8 +94,16 @@ namespace CookingSimulator.Services
                 }));
             }
 
-            while (pending > 0)
+            var batchTimeout = 120f; // 2 分钟总超时
+            var batchElapsed = 0f;
+            while (pending > 0 && batchElapsed < batchTimeout)
+            {
                 yield return null;
+                batchElapsed += Time.deltaTime;
+            }
+
+            if (pending > 0)
+                Debug.LogWarning($"[AI] 批量评价超时，{pending}/{npcs.Count} 个 NPC 未返回，用已有结果继续。");
 
             onAllComplete(results);
         }
@@ -121,34 +129,72 @@ namespace CookingSimulator.Services
 
         // ── 内部实现 ──
 
-        private static IEnumerator RunProviderRequests(AIReviewProvider[] providers, string prompt, Action<string, string> onComplete)
+        /// <summary>协程版：逐个尝试所有 provider 发送请求</summary>
+        private IEnumerator TrySendWithProvidersCoroutine(AIReviewProvider[] providers, string prompt, Action<string, string> onComplete)
         {
-            var completed = false;
-            string responseText = null;
-            string error = null;
-
-            System.Threading.Tasks.Task.Run(() =>
+            var errors = new StringBuilder();
+            foreach (var provider in providers)
             {
-                try
-                {
-                    TrySendWithProviders(providers, prompt, out responseText, out error);
-                }
-                catch (Exception exception)
-                {
-                    error = "AI request failed: " + exception.Message;
-                }
-                finally
-                {
-                    completed = true;
-                }
-            });
+                var requestJson = JsonUtility.ToJson(ChatCompletionRequest.Create(provider.model, prompt));
+                var providerResponse = string.Empty;
+                var providerError = string.Empty;
+                var done = false;
 
-            while (!completed)
-                yield return null;
+                yield return StartCoroutine(SendWebRequestCoroutine(provider, requestJson, (response, error) =>
+                {
+                    providerResponse = response;
+                    providerError = error;
+                    done = true;
+                }));
 
-            onComplete(responseText, error);
+                // 安全兜底：如果回调没触发，等最多 35 秒
+                var timeout = 35f;
+                var elapsed = 0f;
+                while (!done && elapsed < timeout)
+                {
+                    yield return null;
+                    elapsed += Time.deltaTime;
+                }
+
+                if (!done)
+                    providerError = "Request timed out after " + timeout + "s";
+
+                if (string.IsNullOrWhiteSpace(providerError))
+                {
+                    onComplete(providerResponse, null);
+                    yield break;
+                }
+
+                if (errors.Length > 0) errors.Append(" | ");
+                var name = string.IsNullOrWhiteSpace(provider.name) ? "unnamed" : provider.name;
+                errors.Append(name).Append(": ").Append(providerError);
+            }
+
+            onComplete(null, errors.Length == 0 ? "No AI providers configured." : errors.ToString());
         }
 
+        /// <summary>UnityWebRequest 协程：发送单次 POST 请求</summary>
+        private IEnumerator SendWebRequestCoroutine(AIReviewProvider provider, string requestJson, Action<string, string> onComplete)
+        {
+            using (var www = new UnityWebRequest(BuildChatCompletionsUrl(provider.baseUrl), "POST"))
+            {
+                var body = Encoding.UTF8.GetBytes(requestJson);
+                www.uploadHandler = new UploadHandlerRaw(body);
+                www.downloadHandler = new DownloadHandlerBuffer();
+                www.SetRequestHeader("Content-Type", "application/json");
+                www.SetRequestHeader("Authorization", "Bearer " + provider.apiKey);
+                www.timeout = 30;
+
+                yield return www.SendWebRequest();
+
+                if (www.result == UnityWebRequest.Result.Success)
+                    onComplete(www.downloadHandler.text, null);
+                else
+                    onComplete(null, "AI request failed: " + www.responseCode + " " + www.error);
+            }
+        }
+
+        /// <summary>同步版：供 Editor 测试使用</summary>
         private static bool TrySendWithProviders(AIReviewProvider[] providers, string prompt, out string responseText, out string error)
         {
             responseText = null;
@@ -156,7 +202,7 @@ namespace CookingSimulator.Services
             foreach (var provider in providers)
             {
                 var requestJson = JsonUtility.ToJson(ChatCompletionRequest.Create(provider.model, prompt));
-                var result = SendPostRequest(provider, requestJson, out var providerError);
+                var result = SendPostRequestSync(provider, requestJson, out var providerError);
                 if (string.IsNullOrWhiteSpace(providerError))
                 {
                     responseText = result;
@@ -173,12 +219,12 @@ namespace CookingSimulator.Services
             return false;
         }
 
-        private static string SendPostRequest(AIReviewProvider provider, string requestJson, out string error)
+        private static string SendPostRequestSync(AIReviewProvider provider, string requestJson, out string error)
         {
             error = null;
             try
             {
-                var request = (HttpWebRequest)WebRequest.Create(BuildChatCompletionsUrl(provider.baseUrl));
+                var request = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(BuildChatCompletionsUrl(provider.baseUrl));
                 request.Method = "POST";
                 request.ContentType = "application/json";
                 request.Headers["Authorization"] = "Bearer " + provider.apiKey;
@@ -188,13 +234,13 @@ namespace CookingSimulator.Services
                 using (var stream = request.GetRequestStream())
                     stream.Write(body, 0, body.Length);
 
-                using (var response = (HttpWebResponse)request.GetResponse())
+                using (var response = (System.Net.HttpWebResponse)request.GetResponse())
                 using (var reader = new StreamReader(response.GetResponseStream()))
                     return reader.ReadToEnd();
             }
-            catch (WebException exception)
+            catch (System.Net.WebException exception)
             {
-                var status = exception.Response is HttpWebResponse r ? ((int)r.StatusCode).ToString() : "network";
+                var status = exception.Response is System.Net.HttpWebResponse r ? ((int)r.StatusCode).ToString() : "network";
                 error = "AI request failed: " + status + " " + exception.Message;
                 return null;
             }

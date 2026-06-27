@@ -119,6 +119,36 @@ namespace CookingSimulator.Editor
             {
                 throw new InvalidOperationException($"Windows build failed: {report.summary.result}");
             }
+
+            // 复制 AI 配置文件到构建输出目录
+            CopyAIResources(Path.GetDirectoryName(outputPath));
+        }
+
+        private static void CopyAIResources(string buildDir)
+        {
+            // 复制 ai_review.local.json
+            var configSrc = Path.Combine(Application.dataPath, "..", "ai_review.local.json");
+            var configDst = Path.Combine(buildDir, "ai_review.local.json");
+            if (File.Exists(configSrc))
+            {
+                File.Copy(configSrc, configDst, true);
+                Debug.Log($"[Build] Copied AI config to: {configDst}");
+            }
+
+            // 复制 NPC 文件
+            var npcsSrc = Path.Combine(Application.streamingAssetsPath, "NPCs");
+            var npcsDst = Path.Combine(buildDir, "CookingSimulator_Data", "StreamingAssets", "NPCs");
+            if (Directory.Exists(npcsSrc))
+            {
+                if (!Directory.Exists(npcsDst))
+                    Directory.CreateDirectory(npcsDst);
+                foreach (var file in Directory.GetFiles(npcsSrc))
+                {
+                    var fileName = Path.GetFileName(file);
+                    File.Copy(file, Path.Combine(npcsDst, fileName), true);
+                }
+                Debug.Log($"[Build] Copied NPC files to: {npcsDst}");
+            }
         }
 
         private static Canvas CreateCanvas()
