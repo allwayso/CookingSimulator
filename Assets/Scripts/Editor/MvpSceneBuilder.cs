@@ -28,6 +28,7 @@ namespace CookingSimulator.Editor
             var character = CreateCharacter();
             var fridge = CreateFridge(character != null ? character.transform : null);
             var stove = CreateStove(character != null ? character.transform : null);
+            CreateBoundaryWalls();
             CreateCamera();
             var canvas = CreateCanvas();
             var interactionPrompt = CreateInteractionPrompt(canvas);
@@ -54,6 +55,8 @@ namespace CookingSimulator.Editor
             ingredientSelect.gameObject.SetActive(false);
             var reviewWrite = CreateReviewWritePanel(canvas.transform);
             reviewWrite.gameObject.SetActive(false);
+            var leaderboard = CreateLeaderboardPanel(canvas.transform);
+            leaderboard.gameObject.SetActive(false);
 
             // 交互管理器（默认关闭，FreeRoam 时激活）
             var interactionManagerObj = new GameObject("InteractionManager");
@@ -91,6 +94,7 @@ namespace CookingSimulator.Editor
             Assign(gameManager, "playerObject", character);
             Assign(gameManager, "fridgeObject", fridge);
             Assign(gameManager, "reviewWriteUI", reviewWrite);
+            Assign(gameManager, "leaderboardUI", leaderboard);
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/MVP.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MVP.unity", true) };
@@ -128,6 +132,27 @@ namespace CookingSimulator.Editor
             scaler.matchWidthOrHeight = 0.5f;
             canvasObject.AddComponent<GraphicRaycaster>();
             return canvas;
+        }
+
+        private static void CreateBoundaryWalls()
+        {
+            // 房间边界不可见墙（防止角色走出场景）
+            // 摄像机正交尺寸 7.5，可视范围约 ±9.4x ±6.5（1280×720 参考分辨率）
+            CreateWall("Wall_Top",    new Vector2(0f,   4.5f), new Vector2(20f, 0.3f));
+            CreateWall("Wall_Bottom", new Vector2(0f,  -3.2f), new Vector2(20f, 0.3f));
+            CreateWall("Wall_Left",   new Vector2(-10f, 0.6f), new Vector2(0.3f, 8f));
+            CreateWall("Wall_Right",  new Vector2(10f,  0.6f), new Vector2(0.3f, 8f));
+        }
+
+        private static void CreateWall(string name, Vector2 position, Vector2 size)
+        {
+            var wall = new GameObject(name);
+            wall.transform.position = position;
+            var block = wall.AddComponent<BlockObject>();
+            var blockSO = new SerializedObject(block);
+            blockSO.FindProperty("size").vector2Value = size;
+            blockSO.FindProperty("offset").vector2Value = Vector2.zero;
+            blockSO.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void CreateCamera()
@@ -241,6 +266,7 @@ namespace CookingSimulator.Editor
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             var fridge = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
             fridge.name = "Fridge 1 _0"; // 保持原名，人物移动碰撞检测依赖此名称
+            fridge.transform.position = new Vector3(-4f, 4f, 0f);
 
             // 注入运行时引用（prefab 无法预置 player 引用）
             var anim = fridge.GetComponent<冰箱动画>();
@@ -251,13 +277,23 @@ namespace CookingSimulator.Editor
                 animSO.ApplyModifiedPropertiesWithoutUndo();
             }
 
+            // 确保旧 prefab 也有 BlockObject（兼容旧版本 prefab）
+            if (fridge.GetComponent<BlockObject>() == null)
+            {
+                var block = fridge.AddComponent<BlockObject>();
+                var blockSO = new SerializedObject(block);
+                blockSO.FindProperty("size").vector2Value = new Vector2(0.39f, 0.76f);
+                blockSO.FindProperty("offset").vector2Value = new Vector2(-0.175f, 0f);
+                blockSO.ApplyModifiedPropertiesWithoutUndo();
+            }
+
             return fridge;
         }
 
         private static GameObject BuildFridgeAsset()
         {
             var fridge = new GameObject("Fridge 1 _0");
-            fridge.transform.position = new Vector3(-0.08f, -0.36f, 0f);
+            fridge.transform.position = new Vector3(-4f, 4f, 0f);
             fridge.transform.localScale = new Vector3(6.25f, 6.25f, 1f);
 
             var frame0 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/kitchen/Fridge 1 _sprites/Fridge 1 _000.png");
@@ -293,6 +329,13 @@ namespace CookingSimulator.Editor
             intSO.FindProperty("interactionType").enumValueIndex = (int)InteractionType.Fridge;
             intSO.ApplyModifiedPropertiesWithoutUndo();
 
+            // 碰撞体
+            var block = fridge.AddComponent<BlockObject>();
+            var blockSO = new SerializedObject(block);
+            blockSO.FindProperty("size").vector2Value = new Vector2(0.39f, 0.76f);
+            blockSO.FindProperty("offset").vector2Value = new Vector2(-0.175f, 0f);
+            blockSO.ApplyModifiedPropertiesWithoutUndo();
+
             return fridge;
         }
 
@@ -312,7 +355,27 @@ namespace CookingSimulator.Editor
         {
             const string path = "Assets/prefab/kitchen/Stove.prefab";
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            return PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            var stove = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+
+            // 确保旧 prefab 也有 BlockObject + 更新触发距离（兼容旧版本 prefab）
+            if (stove.GetComponent<BlockObject>() == null)
+            {
+                var block = stove.AddComponent<BlockObject>();
+                var blockSO = new SerializedObject(block);
+                blockSO.FindProperty("size").vector2Value = new Vector2(0.4f, 0.3f);
+                blockSO.FindProperty("offset").vector2Value = Vector2.zero;
+                blockSO.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            var interactable = stove.GetComponent<交互物>();
+            if (interactable != null)
+            {
+                var intSO = new SerializedObject(interactable);
+                intSO.FindProperty("triggerDistance").floatValue = 2f;
+                intSO.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            return stove;
         }
 
         private static GameObject BuildStoveAsset()
@@ -337,11 +400,18 @@ namespace CookingSimulator.Editor
             // 交互物组件
             var interactable = stove.AddComponent<交互物>();
             var intSO = new SerializedObject(interactable);
-            intSO.FindProperty("triggerDistance").floatValue = 0.2f;
+            intSO.FindProperty("triggerDistance").floatValue = 2f;
             intSO.FindProperty("bodyOffset").vector3Value = Vector3.zero;
             intSO.FindProperty("promptMessage").stringValue = "按F做菜";
             intSO.FindProperty("interactionType").enumValueIndex = (int)InteractionType.Stove;
             intSO.ApplyModifiedPropertiesWithoutUndo();
+
+            // 碰撞体（只挡灶台核心区域）
+            var block = stove.AddComponent<BlockObject>();
+            var blockSO = new SerializedObject(block);
+            blockSO.FindProperty("size").vector2Value = new Vector2(0.4f, 0.3f);
+            blockSO.FindProperty("offset").vector2Value = Vector2.zero;
+            blockSO.ApplyModifiedPropertiesWithoutUndo();
 
             return stove;
         }
@@ -478,6 +548,15 @@ namespace CookingSimulator.Editor
                     UnityEventTools.AddPersistentListener(btn.onClick, modeUI.EnterFoodieMode);
                 }
             }
+
+            // 追加排行榜按钮（独立定位，屏幕中上区域）
+            var lbBtn = CreateButton(instance.transform, "排行榜", 260);
+            lbBtn.name = "排行榜Button";
+            var lbRect = lbBtn.GetComponent<RectTransform>();
+            lbRect.anchorMin = new Vector2(0.5f, 0.5f);
+            lbRect.anchorMax = new Vector2(0.5f, 0.5f);
+            lbRect.anchoredPosition = new Vector2(0, 296);
+            UnityEventTools.AddPersistentListener(lbBtn.onClick, modeUI.EnterLeaderboard);
 
             return modeUI;
         }
@@ -1002,8 +1081,38 @@ namespace CookingSimulator.Editor
 
             instance.transform.SetParent(parent, false);
             instance.name = "MenuPanel";
+
+            var menuUI = instance.GetComponent<MenuUI>();
+
+            // 追加翻页控件（锚定到底部偏上）
+            var pageRow = new GameObject("PageRow", typeof(RectTransform));
+            pageRow.transform.SetParent(instance.transform, false);
+            var pageRowRect = pageRow.GetComponent<RectTransform>();
+            pageRowRect.anchorMin = new Vector2(0.5f, 0f);
+            pageRowRect.anchorMax = new Vector2(0.5f, 0f);
+            pageRowRect.anchoredPosition = new Vector2(0, 176);
+            SetPreferredSize(pageRow, 400, 36);
+            var pageLayout = pageRow.AddComponent<HorizontalLayoutGroup>();
+            pageLayout.spacing = 16;
+            pageLayout.childAlignment = TextAnchor.MiddleCenter;
+            pageLayout.childControlWidth = false;
+            pageLayout.childControlHeight = true;
+
+            var prevBtn = CreateButton(pageRow.transform, "上一页", 120);
+            var pageText = CreateText(pageRow.transform, "1 / 1");
+            pageText.fontSize = 20;
+            pageText.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 32);
+            var nextBtn = CreateButton(pageRow.transform, "下一页", 120);
+
+            Assign(menuUI, "prevButton", prevBtn);
+            Assign(menuUI, "nextButton", nextBtn);
+            Assign(menuUI, "pageText", pageText);
+
+            UnityEventTools.AddPersistentListener(prevBtn.onClick, menuUI.PrevPage);
+            UnityEventTools.AddPersistentListener(nextBtn.onClick, menuUI.NextPage);
+
             Debug.Log("Build MVP Scene: MenuPanel instantiated directly from prefab.");
-            return instance.GetComponent<MenuUI>();
+            return menuUI;
         }
 
         private static ReviewWriteUI CreateReviewWritePanel(Transform parent)
@@ -1099,6 +1208,98 @@ namespace CookingSimulator.Editor
 
             UnityEventTools.AddPersistentListener(submitButton.onClick, panel.Submit);
             UnityEventTools.AddPersistentListener(cancelButton.onClick, panel.Cancel);
+
+            return panel;
+        }
+
+        private static LeaderboardUI CreateLeaderboardPanel(Transform parent)
+        {
+            var panel = CreatePanel<LeaderboardUI>(parent, "LeaderboardPanel");
+
+            // 调整面板位置到屏幕中上
+            var panelRect = panel.GetComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0.5f, 0.35f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.95f);
+            panelRect.offsetMin = new Vector2(-350, 0);
+            panelRect.offsetMax = new Vector2(350, 0);
+
+            var title = CreateTitle(panel.transform, "排行榜");
+            var titleText = title;
+
+            // Tab 切换行
+            var tabRow = new GameObject("TabRow", typeof(RectTransform));
+            tabRow.transform.SetParent(panel.transform, false);
+            SetPreferredSize(tabRow, 500, 40);
+            var tabLayout = tabRow.AddComponent<HorizontalLayoutGroup>();
+            tabLayout.spacing = 12;
+            tabLayout.childAlignment = TextAnchor.MiddleCenter;
+            tabLayout.childControlWidth = false;
+            tabLayout.childControlHeight = true;
+
+            var chefTab = CreateButton(tabRow.transform, "厨神声望榜", 180);
+            var foodieTab = CreateButton(tabRow.transform, "美食家血量榜", 180);
+
+            // 条目列表区（5 条，每条高 32）
+            var entryRoot = new GameObject("EntryRoot", typeof(RectTransform));
+            entryRoot.transform.SetParent(panel.transform, false);
+            SetPreferredSize(entryRoot, 600, 180);
+            var entryLayout = entryRoot.AddComponent<VerticalLayoutGroup>();
+            entryLayout.spacing = 0;
+            entryLayout.childAlignment = TextAnchor.UpperCenter;
+            entryLayout.childControlWidth = true;
+            entryLayout.childControlHeight = false;
+
+            // 条目模板（纯文本）
+            var entryTemplateObj = new GameObject("EntryTemplate", typeof(RectTransform));
+            entryTemplateObj.transform.SetParent(entryRoot.transform, false);
+            SetPreferredSize(entryTemplateObj, 560, 32);
+            var entryTplText = entryTemplateObj.AddComponent<Text>();
+            entryTplText.fontSize = 22;
+            entryTplText.color = new Color(1f, 0.94f, 0.72f);
+            entryTplText.alignment = TextAnchor.MiddleCenter;
+            entryTplText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            entryTplText.text = "#N  用户名  —  分数";
+            entryTemplateObj.SetActive(false);
+            var entryTemplate = entryTemplateObj.AddComponent<Button>();
+
+            // 间距（下移 2cm ≈ 76px）
+            var spacer = new GameObject("Spacer", typeof(RectTransform));
+            spacer.transform.SetParent(panel.transform, false);
+            SetPreferredSize(spacer, 600, 76);
+
+            // 翻页行
+            var pageRow = new GameObject("PageRow", typeof(RectTransform));
+            pageRow.transform.SetParent(panel.transform, false);
+            SetPreferredSize(pageRow, 400, 36);
+            var pageLayout = pageRow.AddComponent<HorizontalLayoutGroup>();
+            pageLayout.spacing = 16;
+            pageLayout.childAlignment = TextAnchor.MiddleCenter;
+            pageLayout.childControlWidth = false;
+            pageLayout.childControlHeight = true;
+
+            var prevBtn = CreateButton(pageRow.transform, "上一页", 120);
+            var pageText = CreateText(pageRow.transform, "1 / 1");
+            pageText.fontSize = 20;
+            pageText.GetComponent<RectTransform>().sizeDelta = new Vector2(80, 32);
+            var nextBtn = CreateButton(pageRow.transform, "下一页", 120);
+
+            // 返回按钮
+            var backBtn = CreateButton(panel.transform, "返回");
+
+            Assign(panel, "titleText", titleText);
+            Assign(panel, "entryRoot", entryRoot.transform);
+            Assign(panel, "entryTemplate", entryTemplate);
+            Assign(panel, "chefTabButton", chefTab);
+            Assign(panel, "foodieTabButton", foodieTab);
+            Assign(panel, "prevButton", prevBtn);
+            Assign(panel, "nextButton", nextBtn);
+            Assign(panel, "pageText", pageText);
+
+            UnityEventTools.AddPersistentListener(chefTab.onClick, panel.SwitchToChef);
+            UnityEventTools.AddPersistentListener(foodieTab.onClick, panel.SwitchToFoodie);
+            UnityEventTools.AddPersistentListener(prevBtn.onClick, panel.PrevPage);
+            UnityEventTools.AddPersistentListener(nextBtn.onClick, panel.NextPage);
+            UnityEventTools.AddPersistentListener(backBtn.onClick, panel.Back);
 
             return panel;
         }

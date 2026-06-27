@@ -15,26 +15,12 @@ public class 人物移动 : MonoBehaviour
     private float walkTimer;
     private bool wasMovingLastFrame;
 
-    // obstacle — sprite is 74px wide, PPU 100, pivot center at 37px
-    // visible fridge body is ~39px on LEFT side, its center ~19.5px from left edge
-    // offset from sprite center = 19.5 - 37 = -17.5px = -0.175 world units (at scale 1)
-    private Transform obstacleTransform;
-    private Vector2 obstacleSize   = new Vector2(0.39f, 0.76f);
-    private Vector2 obstacleOffset = new Vector2(-0.175f, 0f);
+    private BlockObject[] obstacles;
 
     void Start()
     {
-        // find fridge by name
-        GameObject fridge = GameObject.Find("Fridge 1 _0");
-        if (fridge != null)
-        {
-            obstacleTransform = fridge.transform;
-            Debug.Log("[Move] Found obstacle: " + fridge.name + " at " + obstacleTransform.position);
-        }
-        else
-        {
-            Debug.LogError("[Move] Fridge not found! Make sure GameObject is named 'Fridge 1 _0'");
-        }
+        obstacles = FindObjectsOfType<BlockObject>();
+        Debug.Log($"[Move] Found {obstacles.Length} block obstacles");
 
         sr = GetComponent<SpriteRenderer>();
         if (idleSprite == null && sr != null)
@@ -48,32 +34,32 @@ public class 人物移动 : MonoBehaviour
         Vector3 dir = new Vector3(h, v, 0f).normalized;
         Vector3 move = dir * moveSpeed * Time.deltaTime;
 
-        if (obstacleTransform != null)
+        if (obstacles != null && obstacles.Length > 0)
         {
             Vector2 mySz = new Vector2(
                 characterSize.x * Mathf.Abs(transform.localScale.x),
                 characterSize.y * Mathf.Abs(transform.localScale.y));
 
-            Vector2 obsSz = new Vector2(
-                obstacleSize.x * Mathf.Abs(obstacleTransform.localScale.x),
-                obstacleSize.y * Mathf.Abs(obstacleTransform.localScale.y));
-
             Vector2 newPos = transform.position + move;
 
-            Vector2 worldObsOffset = new Vector2(
-                obstacleOffset.x * Mathf.Abs(obstacleTransform.localScale.x),
-                obstacleOffset.y * Mathf.Abs(obstacleTransform.localScale.y));
-            Vector2 obsPos = (Vector2)obstacleTransform.position + worldObsOffset;
-
-            if (AABB(newPos, mySz, obsPos, obsSz))
+            foreach (var obs in obstacles)
             {
-                Vector2 xPos = (Vector2)transform.position + new Vector2(move.x, 0f);
-                if (AABB(xPos, mySz, obsPos, obsSz))
-                    move.x = 0f;
+                if (obs == null) continue;
 
-                Vector2 yPos = (Vector2)transform.position + new Vector2(0f, move.y);
-                if (AABB(yPos, mySz, obsPos, obsSz))
-                    move.y = 0f;
+                Vector2 obsPos = obs.GetWorldCenter();
+                Vector2 obsSz = obs.GetWorldSize();
+
+                if (AABB(newPos, mySz, obsPos, obsSz))
+                {
+                    // 分别尝试 X / Y 分量，允许滑墙
+                    Vector2 xPos = (Vector2)transform.position + new Vector2(move.x, 0f);
+                    if (AABB(xPos, mySz, obsPos, obsSz))
+                        move.x = 0f;
+
+                    Vector2 yPos = (Vector2)transform.position + new Vector2(0f, move.y);
+                    if (AABB(yPos, mySz, obsPos, obsSz))
+                        move.y = 0f;
+                }
             }
         }
 
@@ -112,9 +98,9 @@ public class 人物移动 : MonoBehaviour
                 walkTimer = 0f;
                 currentWalkFrame = 0;
             }
-
-            wasMovingLastFrame = isMoving;
         }
+
+        wasMovingLastFrame = move.x != 0f || move.y != 0f;
     }
 
     bool AABB(Vector2 c1, Vector2 s1, Vector2 c2, Vector2 s2)

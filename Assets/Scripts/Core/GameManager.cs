@@ -25,6 +25,7 @@ namespace CookingSimulator.Core
         [SerializeField] private ReviewUI reviewUI;
         [SerializeField] private SaveDishUI saveDishUI;
         [SerializeField] private ReviewWriteUI reviewWriteUI;
+        [SerializeField] private LeaderboardUI leaderboardUI;
         [SerializeField] private MenuUI menuUI;
         [SerializeField] private StatusBarUI statusBarUI;
         [SerializeField] private GameObject loginBackgroundRoot;
@@ -76,9 +77,22 @@ namespace CookingSimulator.Core
         {
             currentUser = saveManager.LoadOrCreateUser(username);
             statusBarUI?.Show(currentUser);
-            modeSelectUI.Show(currentUser, EnterChefMode, EnterFoodieMode);
+            modeSelectUI.Show(currentUser, EnterChefMode, EnterFoodieMode, ShowLeaderboard);
             Hide(loginUI);
             SetLoginBackgroundVisible(true);
+        }
+
+        public void ShowLeaderboard()
+        {
+            var users = saveManager.LoadAllUsers();
+            leaderboardUI.Show(users, BackToModeSelect);
+            Hide(modeSelectUI);
+        }
+
+        public void BackToModeSelect()
+        {
+            Hide(leaderboardUI);
+            modeSelectUI.Show(currentUser, EnterChefMode, EnterFoodieMode, ShowLeaderboard);
         }
 
         public void EnterChefMode()
@@ -98,6 +112,8 @@ namespace CookingSimulator.Core
             Hide(cookingUI);
             Hide(reviewUI);
             Hide(saveDishUI);
+            Hide(reviewWriteUI);
+            Hide(leaderboardUI);
             Hide(menuUI);
             statusBarUI?.Show(currentUser);
             SetLoginBackgroundVisible(true);
@@ -632,6 +648,8 @@ namespace CookingSimulator.Core
             Hide(cookingUI);
             Hide(reviewUI);
             Hide(saveDishUI);
+            Hide(reviewWriteUI);
+            Hide(leaderboardUI);
             Hide(menuUI);
             Hide(statusBarUI);
             SetLoginBackgroundVisible(true);

@@ -19,7 +19,7 @@ namespace CookingSimulator.UI
             onSave = saveAction;
             onDiscard = discardAction;
             gameObject.SetActive(true);
-            dishNameInput.text = "我的番茄炒蛋";
+            dishNameInput.text = string.Empty;
             priceInput.text = "18";
             messageText.text = string.Empty;
         }

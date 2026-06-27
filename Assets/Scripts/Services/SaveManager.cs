@@ -59,6 +59,22 @@ namespace CookingSimulator.Services
             return user;
         }
 
+        public List<UserData> LoadAllUsers()
+        {
+            EnsureDirectories();
+            var users = new List<UserData>();
+            if (!Directory.Exists(UsersPath))
+                return users;
+
+            foreach (var path in Directory.GetFiles(UsersPath, "*.json"))
+            {
+                var user = JsonUtility.FromJson<UserData>(File.ReadAllText(path));
+                users.Add(user);
+            }
+
+            return users;
+        }
+
         public void SaveUser(UserData user)
         {
             EnsureDirectories();

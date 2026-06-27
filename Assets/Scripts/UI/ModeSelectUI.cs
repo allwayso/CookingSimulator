@@ -11,11 +11,14 @@ namespace CookingSimulator.UI
 
         private Action onChefMode;
         private Action onFoodieMode;
+        private Action onLeaderboard;
 
-        public void Show(UserData user, Action chefModeAction, Action foodieModeAction = null)
+        public void Show(UserData user, Action chefModeAction, Action foodieModeAction = null,
+            Action leaderboardAction = null)
         {
             onChefMode = chefModeAction;
             onFoodieMode = foodieModeAction;
+            onLeaderboard = leaderboardAction;
             gameObject.SetActive(true);
             userInfoText.text = $"{user.username}, you've still got {user.reputation} reputation points to squander";
         }
@@ -28,6 +31,11 @@ namespace CookingSimulator.UI
         public void EnterFoodieMode()
         {
             onFoodieMode?.Invoke();
+        }
+
+        public void EnterLeaderboard()
+        {
+            onLeaderboard?.Invoke();
         }
     }
 }

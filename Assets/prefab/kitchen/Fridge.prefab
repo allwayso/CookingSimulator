@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &664663187507363709
+--- !u!1 &5183997797448892361
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,10 +8,11 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1457594886472090028}
-  - component: {fileID: 6431075573440501028}
-  - component: {fileID: 7041184323923015533}
-  - component: {fileID: 2182957083714824446}
+  - component: {fileID: 123444222759718008}
+  - component: {fileID: 1874141072453376670}
+  - component: {fileID: 535984935521515247}
+  - component: {fileID: 1079005812438746170}
+  - component: {fileID: 6238381358584505848}
   m_Layer: 0
   m_Name: Fridge
   m_TagString: Untagged
@@ -19,28 +20,28 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1457594886472090028
+--- !u!4 &123444222759718008
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 664663187507363709}
+  m_GameObject: {fileID: 5183997797448892361}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4, y: 4, z: 0}
+  m_LocalPosition: {x: -0.08, y: -0.36, z: 0}
   m_LocalScale: {x: 6.25, y: 6.25, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &6431075573440501028
+--- !u!212 &1874141072453376670
 SpriteRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 664663187507363709}
+  m_GameObject: {fileID: 5183997797448892361}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -74,7 +75,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 1
+  m_SortingOrder: 5
   m_Sprite: {fileID: 21300000, guid: bda2505cf545f8c47abc3d70e8fedcc6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -86,13 +87,13 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!114 &7041184323923015533
+--- !u!114 &535984935521515247
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 664663187507363709}
+  m_GameObject: {fileID: 5183997797448892361}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a3df1b7c9e2f4d5a6b7c8d9e0f1a2b3, type: 3}
@@ -107,13 +108,13 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 1386bbca103fed940afc3b2f8b1cc212, type: 3}
   triggerDistance: 4
   frameDuration: 0.12
---- !u!114 &2182957083714824446
+--- !u!114 &1079005812438746170
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 664663187507363709}
+  m_GameObject: {fileID: 5183997797448892361}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cae52273ecdd83240a7a649d644198b5, type: 3}
@@ -123,3 +124,17 @@ MonoBehaviour:
   bodyOffset: {x: -0.175, y: 0, z: 0}
   promptMessage: "\u6309F\u9009\u83DC"
   interactionType: 0
+--- !u!114 &6238381358584505848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5183997797448892361}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49b757d36ade02e40a216af476363b60, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  size: {x: 0.39, y: 0.76}
+  offset: {x: -0.175, y: 0}
